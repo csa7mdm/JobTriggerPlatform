@@ -1,0 +1,44 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Visual Studio / .NET
+.vs/
+.vscode/
+bin/
+obj/
+out/
+**/*.csproj.user
+**/*.trx
+**/*.dll
+**/*.exe
+**/*.pdb
+**/*.bak
+**/*.log
+**/*.vspscc
+**/*.vssscc
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/coverage/
+frontend/npm-debug.log
+frontend/yarn-error.log
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# Docs and misc
+README.md
+LICENSE
+docs/
+*.md

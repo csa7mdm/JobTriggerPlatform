@@ -1,0 +1,45 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+coverage/
+.nyc_output/
+
+# Build output
+dist/
+build/
+.vite/
+
+# Development
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+*.local
+
+# Editor directories and files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Tests
+/test/
+/tests/
+/coverage/
+/.nyc_output/
+
+# Misc
+README.md
+LICENSE
+.DS_Store
+Thumbs.db

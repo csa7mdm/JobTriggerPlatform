@@ -1,0 +1,15 @@
+{
+  "Seq": {
+    "ForwardedHeaders": {
+      "Enabled": true,
+      "HeaderPrefix": "X-Forwarded-"
+    },
+    "Web": {
+      "PathBase": "/logs"
+    },
+    "Api": {
+      "IngressApiKey": "PXzKqXK6i95OeHgE7ZE0",
+      "AuthenticationSchemes": ["Ingress", "Api", "Username"]
+    }
+  }
+}

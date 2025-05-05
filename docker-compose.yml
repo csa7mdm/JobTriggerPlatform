@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  webapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=jobplatform;Username=postgres;Password=postgres;
+      - Serilog__WriteTo__1__Name=Seq
+      - Serilog__WriteTo__1__Args__serverUrl=http://seq:5341
+      - Serilog__MinimumLevel__Default=Information
+      - Serilog__MinimumLevel__Override__Microsoft=Warning
+      - Serilog__WriteTo__1__Args__apiKey=${SEQ_API_KEY:-PXzKqXK6i95OeHgE7ZE0}
+    depends_on:
+      - postgres
+      - seq
+    networks:
+      - deployment-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    volumes:
+      - app-logs:/app/logs
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - webapi
+    networks:
+      - deployment-network
+    restart: unless-stopped
+    # Healthcheck for Nginx
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=jobplatform
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - deployment-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  seq:
+    image: datalust/seq:latest
+    environment:
+      - ACCEPT_EULA=Y
+      - SEQ_FIRSTRUN_ADMINPASSWORDHASH=${SEQ_ADMIN_PASSWORD_HASH:-}
+      - SEQ_API_INGESTKEY=${SEQ_API_KEY:-PXzKqXK6i95OeHgE7ZE0}
+    ports:
+      - "5341:80"
+      - "5342:5341" # The ingestion port
+    volumes:
+      - seq-data:/data
+      - ./docker/seq/seq.json:/data/seq.json
+    networks:
+      - deployment-network
+    restart: unless-stopped
+
+networks:
+  deployment-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  seq-data:
+  app-logs:
