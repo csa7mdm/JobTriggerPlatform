@@ -17,54 +17,72 @@ public static class JobEndpoints
     /// Maps the job endpoints to the application.
     /// </summary>
     /// <param name="app">The web application.</param>
-    /// <returns>The web application.</returns>
-    public static WebApplication MapJobEndpoints(this WebApplication app)
+    /// <returns>A collection of endpoint route handlers.</returns>
+    public static IEnumerable<RouteHandlerBuilder> MapJobEndpoints(this WebApplication app)
     {
         var jobsGroup = app.MapGroup("/api/jobs")
-            .WithTags("Jobs")
-            .WithOpenApi()
-            .WithJobsOpenApi();
+            .WithTags("Jobs");
+
+        var endpoints = new List<RouteHandlerBuilder>();
 
         // Get all available jobs
-        jobsGroup.MapGet("/", GetJobs)
+        var getJobsEndpoint = jobsGroup.MapGet("/", GetJobs)
             .WithName("GetJobs")
             .RequireAuthorization()
-            .WithGetJobsOpenApi();
+            .WithDescription("Gets all jobs that the current user has access to.")
+            .WithTags("Jobs");
+        endpoints.Add(getJobsEndpoint);
 
         // Get job details
-        jobsGroup.MapGet("/{name}", GetJob)
+        var getJobEndpoint = jobsGroup.MapGet("/{name}", GetJob)
             .WithName("GetJob")
             .RequireAuthorization(policy => policy.RequireJobAccess())
-            .WithGetJobOpenApi();
+            .WithDescription("Gets details for a specific job.")
+            .WithTags("Jobs");
+        endpoints.Add(getJobEndpoint);
 
         // Trigger a job
-        jobsGroup.MapPost("/{name}", TriggerJob)
+        var triggerJobEndpoint = jobsGroup.MapPost("/{name}", TriggerJob)
             .WithName("TriggerJob")
             .RequireAuthorization(policy => policy.RequireJobAccess())
             .Accepts<JobTriggerRequest>("application/json")
-            .WithTriggerJobOpenApi();
+            .WithDescription("Triggers a job with the provided parameters.")
+            .WithTags("Jobs");
+        endpoints.Add(triggerJobEndpoint);
 
         // Get all plugins
-        jobsGroup.MapGet("/plugins", GetPlugins)
+        var getPluginsEndpoint = jobsGroup.MapGet("/plugins", GetPlugins)
             .WithName("GetPlugins")
-            .RequireAuthorization(policy => policy.RequireRole("Admin"));
+            .RequireAuthorization(policy => policy.RequireRole("Admin"))
+            .WithDescription("Gets all available plugins (Admin only).")
+            .WithTags("Plugins");
+        endpoints.Add(getPluginsEndpoint);
 
         // Get plugin details
-        jobsGroup.MapGet("/plugins/{name}", GetPlugin)
+        var getPluginEndpoint = jobsGroup.MapGet("/plugins/{name}", GetPlugin)
             .WithName("GetPlugin")
-            .RequireAuthorization(policy => policy.RequireRole("Admin"));
+            .RequireAuthorization(policy => policy.RequireRole("Admin"))
+            .WithDescription("Gets details for a specific plugin (Admin only).")
+            .WithTags("Plugins");
+        endpoints.Add(getPluginEndpoint);
 
         // Get job history
-        jobsGroup.MapGet("/history", GetJobHistory)
+        var getJobHistoryEndpoint = jobsGroup.MapGet("/history", GetJobHistory)
             .WithName("GetJobHistory")
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithDescription("Gets history for all jobs the user has access to.")
+            .WithTags("History");
+        endpoints.Add(getJobHistoryEndpoint);
 
         // Get job history for a specific job
-        jobsGroup.MapGet("/history/{name}", GetJobHistoryByName)
+        var getJobHistoryByNameEndpoint = jobsGroup.MapGet("/history/{name}", GetJobHistoryByName)
             .WithName("GetJobHistoryByName")
-            .RequireAuthorization(policy => policy.RequireJobAccess());
+            .RequireAuthorization(policy => policy.RequireJobAccess())
+            .WithDescription("Gets history for a specific job.")
+            .WithTags("History");
+        endpoints.Add(getJobHistoryByNameEndpoint);
 
-        return app;
+        return endpoints;
     }
 
     /// <summary>
@@ -160,12 +178,79 @@ public static class JobEndpoints
         try
         {
             // Create and run the validator for the request
-            var validator = new JobTriggerRequestValidator(plugin);
+            var validator = new JobTriggerRequestValidator();
             var validationResult = await validator.ValidateAsync(request);
 
-            if (!validationResult.IsValid)
+            // Perform manual validation for the plugin-specific parameters
+            var validationErrors = new Dictionary<string, string[]>();
+
+            // Validate that all required parameters are present
+            foreach (var parameter in plugin.Parameters.Where(p => p.IsRequired))
             {
-                return Results.ValidationProblem(validationResult.ToDictionary());
+                if (!request.Parameters.ContainsKey(parameter.Name) || 
+                    string.IsNullOrEmpty(request.Parameters[parameter.Name]))
+                {
+                    validationErrors[$"Parameters.{parameter.Name}"] = 
+                        new[] { $"Parameter '{parameter.Name}' is required." };
+                }
+            }
+
+            // Validate parameters with specific types
+            foreach (var parameter in plugin.Parameters)
+            {
+                if (!request.Parameters.ContainsKey(parameter.Name) || 
+                    string.IsNullOrEmpty(request.Parameters[parameter.Name]))
+                {
+                    continue;
+                }
+
+                switch (parameter.Type)
+                {
+                    case ParameterType.Number:
+                        if (!decimal.TryParse(request.Parameters[parameter.Name], out _))
+                        {
+                            validationErrors[$"Parameters.{parameter.Name}"] = 
+                                new[] { $"Parameter '{parameter.Name}' must be a valid number." };
+                        }
+                        break;
+
+                    case ParameterType.Boolean:
+                        if (!bool.TryParse(request.Parameters[parameter.Name], out _))
+                        {
+                            validationErrors[$"Parameters.{parameter.Name}"] = 
+                                new[] { $"Parameter '{parameter.Name}' must be a valid boolean (true/false)." };
+                        }
+                        break;
+
+                    case ParameterType.Date:
+                        if (!DateTime.TryParse(request.Parameters[parameter.Name], out _))
+                        {
+                            validationErrors[$"Parameters.{parameter.Name}"] = 
+                                new[] { $"Parameter '{parameter.Name}' must be a valid date." };
+                        }
+                        break;
+
+                    case ParameterType.Select:
+                        if (parameter.PossibleValues != null && 
+                            !parameter.PossibleValues.Contains(request.Parameters[parameter.Name]))
+                        {
+                            validationErrors[$"Parameters.{parameter.Name}"] = 
+                                new[] { $"Parameter '{parameter.Name}' must be one of: {string.Join(", ", parameter.PossibleValues)}." };
+                        }
+                        break;
+                }
+            }
+
+            // Combine FluentValidation results with manual validation
+            if (!validationResult.IsValid || validationErrors.Count > 0)
+            {
+                var combinedErrors = validationResult.ToDictionary();
+                foreach (var error in validationErrors)
+                {
+                    combinedErrors[error.Key] = error.Value;
+                }
+
+                return Results.ValidationProblem(combinedErrors);
             }
 
             logger.LogInformation("Triggering job {JobName} with parameters: {@Parameters}", name, request.Parameters);
@@ -407,6 +492,6 @@ internal static class AuthorizationPolicyBuilderExtensions
     /// <returns>The authorization policy builder.</returns>
     public static AuthorizationPolicyBuilder RequireRole(this AuthorizationPolicyBuilder builder, string role)
     {
-        return builder.RequireRole(role);
+        return builder.RequireRole(new[] { role });
     }
 }

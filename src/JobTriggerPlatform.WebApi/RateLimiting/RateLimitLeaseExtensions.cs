@@ -15,10 +15,9 @@ public static class RateLimitLeaseExtensions
     public static string GetRetryAfterMetadata(this RateLimitLease lease)
     {
         TimeSpan? retryAfter = null;
-        if (lease.TryGetMetadata(MetadataName.RetryAfter, out object? metadataValue) &&
-            metadataValue is TimeSpan timeSpanValue)
+        if (lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfterTimeSpan))
         {
-            retryAfter = timeSpanValue;
+            retryAfter = retryAfterTimeSpan;
         }
 
         return retryAfter?.ToString() ?? "unknown";

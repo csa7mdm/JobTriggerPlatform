@@ -6,13 +6,16 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>13.0</LangVersion>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="FluentValidation.AspNetCore" Version="11.3.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.0" />
-    <PackageReference Include="NetEscapades.AspNetCore.SecurityHeaders" Version="8.0.0" />
+    <PackageReference Include="Microsoft.OpenApi" Version="1.6.24" />
+    
+    <PackageReference Include="NetEscapades.AspNetCore.SecurityHeaders" Version="1.0.0" />
     <PackageReference Include="QRCoder" Version="1.6.0" />
     <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
     <PackageReference Include="Serilog.Enrichers.Environment" Version="2.3.0" />
@@ -22,7 +25,7 @@
     <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
     <PackageReference Include="Serilog.Sinks.Async" Version="1.5.0" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.0" />
+    <PackageReference Include="NSwag.AspNetCore" Version="14.0.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -30,3 +33,4 @@
   </ItemGroup>
 
 </Project>
+

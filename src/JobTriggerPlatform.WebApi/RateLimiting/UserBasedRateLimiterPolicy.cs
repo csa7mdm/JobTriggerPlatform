@@ -65,10 +65,9 @@ public class UserBasedRateLimiterPolicy : IRateLimiterPolicy<string>
 
             // Get retry after metadata if available
             TimeSpan? retryAfter = null;
-            if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out object? metadataValue) && 
-                metadataValue is TimeSpan timeSpanValue)
+            if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfterTimeSpan))
             {
-                retryAfter = timeSpanValue;
+                retryAfter = retryAfterTimeSpan;
             }
 
             if (retryAfter.HasValue)

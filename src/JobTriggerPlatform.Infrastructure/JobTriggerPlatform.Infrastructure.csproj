@@ -13,9 +13,9 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authorization" Version="9.0.4" />
-    <PackageReference Include="Microsoft.AspNetCore.Http" Version="9.0.4" />
-    <PackageReference Include="Microsoft.AspNetCore.Identity" Version="9.0.4" />
-    <PackageReference Include="Microsoft.AspNetCore.Routing.Abstractions" Version="9.0.4" />
+    <PackageReference Include="Microsoft.AspNetCore.Http" Version="2.3.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity" Version="2.3.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Routing.Abstractions" Version="2.3.0" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.4" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="9.4.0" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
@@ -23,3 +23,4 @@
   </ItemGroup>
 
 </Project>
+

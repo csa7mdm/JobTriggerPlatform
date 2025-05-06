@@ -15,42 +15,40 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
-using Serilog;
-using Serilog.Events;
+using Microsoft.Extensions.Logging;
+using System;
+using System.IO;
 using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Threading.RateLimiting;
 
-// Create a logger for startup
-Log.Logger = new LoggerConfiguration()
-    .WriteTo.Console()
-    .CreateBootstrapLogger();
-
 var builder = WebApplication.CreateBuilder(args);
 
 try
 {
-    // Configure Serilog
-    builder.Host.UseSerilog((context, services, configuration) => configuration
-        .ReadFrom.Configuration(context.Configuration)
-        .ReadFrom.Services(services)
-        .Enrich.FromLogContext()
-        .Enrich.WithMachineName()
-        .Enrich.WithProcessId()
-        .Enrich.WithThreadId()
-        .WriteTo.Console(
-            outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
-        .WriteTo.Async(a => a.File(
-            path: "logs/log-.json",
-            rollingInterval: RollingInterval.Day,
-            restrictedToMinimumLevel: LogEventLevel.Information,
-            formatter: new Serilog.Formatting.Json.JsonFormatter()))
-    );
+    // Ensure plugins directory exists
+    var pluginsDirectory = Path.Combine(AppContext.BaseDirectory, "Plugins");
+    if (!Directory.Exists(pluginsDirectory))
+    {
+        Directory.CreateDirectory(pluginsDirectory);
+        Console.WriteLine($"Created plugins directory at {pluginsDirectory}");
+    }
+    
+    // Configure standard logging
+    builder.Logging.ClearProviders();
+    builder.Logging.AddConsole();
+    builder.Logging.AddDebug();
 
     // Add services to the container
     builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen();
+    
+    // Add OpenAPI support
+    builder.Services.AddOpenApiDocument(config => {
+        config.Title = "JobTriggerPlatform API";
+        config.Description = "API for triggering and managing deployment jobs";
+        config.Version = "v1";
+    });
 
     // Configure antiforgery
     builder.Services.AddAntiforgery(options =>
@@ -69,15 +67,17 @@ try
         options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
         // Add a named policy for user-based rate limiting
-        options.AddPolicy<string, UserBasedRateLimiterPolicy>("user-based-policy", policy =>
+        options.AddPolicy<string>("user-based-policy", context =>
         {
-            var loggerFactory = policy.RequestServices.GetRequiredService<ILoggerFactory>();
+            var loggerFactory = context.RequestServices.GetRequiredService<ILoggerFactory>();
             var logger = loggerFactory.CreateLogger<UserBasedRateLimiterPolicy>();
-            return new UserBasedRateLimiterPolicy(
+            var policy = new UserBasedRateLimiterPolicy(
                 permitLimit: 100,  // 100 requests
                 windowInMinutes: 1,  // per minute
                 queueLimit: 0,     // no queuing
                 logger);
+                
+            return policy.GetPartition(context);
         });
 
         // Add a fixed window limiter for global rate limiting
@@ -92,9 +92,7 @@ try
         // Add a concurrency limiter to limit the number of concurrent requests
         options.AddConcurrencyLimiter("Concurrency", options =>
         {
-            options.PermitLimit =
-
-            100;
+            options.PermitLimit = 100;
             options.QueueLimit = 50;
             options.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
         });
@@ -171,23 +169,22 @@ try
         };
     });
 
-    // Add Authorization
+    // Set up default authorization policies
+    var authBuilder = builder.Services.AddAuthorizationBuilder()
+        .AddPolicy("RequireAdminRole", policy => policy.RequireRole("Admin"))
+        .AddPolicy("RequireDevRole", policy => policy.RequireRole("Dev"))
+        .AddPolicy("RequireQARole", policy => policy.RequireRole("QA"));
+
+    // Create policies for job access
+    authBuilder.AddPolicy("JobAccess:SampleJob", policy =>
+        policy.AddRequirements(new JobAccessRequirement("SampleJob")));
+
+    authBuilder.AddPolicy("JobAccess:AdvancedDeployment", policy =>
+        policy.AddRequirements(new JobAccessRequirement("AdvancedDeployment")));
+        
+    // Add a fallback policy
     builder.Services.AddAuthorization(options =>
     {
-        // Basic role-based policies
-        options.AddPolicy("RequireAdminRole", policy => policy.RequireRole("Admin"));
-        options.AddPolicy("RequireDevRole", policy => policy.RequireRole("Dev"));
-        options.AddPolicy("RequireQARole", policy => policy.RequireRole("QA"));
-
-        // Initially register placeholder policies for job access
-        // These will be properly configured after plugins are loaded
-        options.AddPolicy("JobAccess:SampleJob", policy =>
-            policy.Requirements.Add(new JobAccessRequirement("SampleJob")));
-
-        options.AddPolicy("JobAccess:AdvancedDeployment", policy =>
-            policy.Requirements.Add(new JobAccessRequirement("AdvancedDeployment")));
-
-        // Add a fallback policy
         options.FallbackPolicy = new AuthorizationPolicyBuilder()
             .RequireAuthenticatedUser()
             .Build();
@@ -232,11 +229,10 @@ try
         };
     });
 
-    // Add FluentValidation
-    builder.Services.AddFluentValidation(fv =>
-    {
-        fv.RegisterValidatorsFromAssemblyContaining<Program>();
-    });
+    // Add FluentValidation without auto-registration
+    builder.Services.AddFluentValidation();
+    // Manually register any validators we need except JobTriggerRequestValidator
+    // This avoids the circular dependency issue
 
     // Configure body size limits
     builder.WebHost.ConfigureKestrel(options =>
@@ -271,27 +267,15 @@ try
     // Configure the HTTP request pipeline
     if (app.Environment.IsDevelopment())
     {
-        app.UseSwagger();
-        app.UseSwaggerUI();
+        // Configure OpenAPI/Swagger middleware
+        app.UseOpenApi();
+        app.UseSwaggerUi();
     }
     else
     {
         // Use HSTS in production
         app.UseHsts();
     }
-
-    // Add Serilog request logging
-    app.UseSerilogRequestLogging(options =>
-    {
-        options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
-        options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
-        {
-            diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value);
-            diagnosticContext.Set("RequestScheme", httpContext.Request.Scheme);
-            diagnosticContext.Set("UserAgent", httpContext.Request.Headers["User-Agent"].ToString());
-            diagnosticContext.Set("ClientIP", httpContext.Connection.RemoteIpAddress?.ToString());
-        };
-    });
 
     // Use cookie policy
     app.UseCookiePolicy();
@@ -328,14 +312,24 @@ try
     // Map controllers
     var controllerEndpoints = app.MapControllers();
 
-    // Apply rate limiting to controller endpoints - using endpoints now
+    // Apply rate limiting to controller endpoints
     controllerEndpoints.RequireRateLimiting("Concurrency");
 
-    // Map job endpoints and apply rate limiting
+    // Map job endpoints
     var jobEndpoints = app.MapJobEndpoints();
+    
+    // For each job endpoint, apply rate limiting
+    foreach (var endpoint in jobEndpoints)
+    {
+        endpoint.RequireRateLimiting("Global");
+    }
 
-    // Apply rate limiting policy to job endpoints
-    jobEndpoints.RequireRateLimiting("UserBasedRateLimiter");
+    // Map root endpoint
+    var rootGroup = app.MapGroup("/");
+    rootGroup.MapGet("/", () => "JobTriggerPlatform API is running")
+        .WithName("GetRoot")
+        .WithTags("Root")
+        .RequireRateLimiting("Global");
 
     // Seed roles
     try
@@ -356,27 +350,13 @@ try
     }
     catch (Exception ex)
     {
-        Log.Fatal(ex, "An error occurred while seeding roles or configuring authorization");
+        Console.WriteLine($"An error occurred while seeding roles or configuring authorization: {ex.Message}");
     }
-
-    // Map root endpoint with OpenAPI
-    var rootEndpoint = app.MapGet("/", () => "JobTriggerPlatform API is running")
-        .WithName("GetRoot")
-        .WithOpenApi();
-
-    // Apply rate limiting to root endpoint - using endpoints now
-    rootEndpoint.RequireRateLimiting("Global");
-
-    // Ensure any buffered events are sent at shutdown
-    app.Lifetime.ApplicationStopped.Register(Log.CloseAndFlush);
 
     app.Run();
 }
 catch (Exception ex)
 {
-    Log.Fatal(ex, "Application start-up failed");
-}
-finally
-{
-    Log.CloseAndFlush();
+    Console.WriteLine($"Application start-up failed: {ex.Message}");
+    Console.WriteLine(ex.StackTrace);
 }
