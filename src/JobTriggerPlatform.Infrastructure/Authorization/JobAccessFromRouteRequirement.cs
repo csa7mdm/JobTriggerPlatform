@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
+using System.Security.Claims;
 
 namespace JobTriggerPlatform.Infrastructure.Authorization;
 
@@ -45,7 +44,7 @@ public class JobAccessFromRouteHandler : AuthorizationHandler<JobAccessFromRoute
 
     /// <inheritdoc/>
     protected override async Task HandleRequirementAsync(
-        AuthorizationHandlerContext context, 
+        AuthorizationHandlerContext context,
         JobAccessFromRouteRequirement requirement)
     {
         var httpContext = _httpContextAccessor.HttpContext;
@@ -63,21 +62,21 @@ public class JobAccessFromRouteHandler : AuthorizationHandler<JobAccessFromRoute
         }
 
         string jobName = nameValue.ToString()!;
-        
+
         // Use the JobAccessRequirement to check if the user has access to the job
         var authorizationResult = await _authorizationService.AuthorizeAsync(
             context.User, null, new JobAccessRequirement(jobName));
-            
+
         if (authorizationResult.Succeeded)
         {
             context.Succeed(requirement);
-            
-            _logger.LogInformation("User {UserId} granted access to job {JobName} via route-based check", 
+
+            _logger.LogInformation("User {UserId} granted access to job {JobName} via route-based check",
                 context.User.FindFirstValue(ClaimTypes.NameIdentifier), jobName);
         }
         else
         {
-            _logger.LogWarning("User {UserId} denied access to job {JobName} via route-based check", 
+            _logger.LogWarning("User {UserId} denied access to job {JobName} via route-based check",
                 context.User.FindFirstValue(ClaimTypes.NameIdentifier), jobName);
         }
     }

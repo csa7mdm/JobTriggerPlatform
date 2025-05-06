@@ -3,6 +3,7 @@ using JobTriggerPlatform.Domain.Identity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
 
 namespace JobTriggerPlatform.WebApi.Controllers;
 
@@ -252,7 +253,7 @@ public class RoleModel
     /// </summary>
     [Required]
     public string Name { get; set; } = string.Empty;
-    
+
     /// <summary>
     /// Gets or sets the description of the role.
     /// </summary>

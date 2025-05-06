@@ -1,11 +1,12 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
 using JobTriggerPlatform.Application.Interfaces;
 using JobTriggerPlatform.Domain.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
+using System.ComponentModel.DataAnnotations;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 
 namespace JobTriggerPlatform.WebApi.Controllers;
 
@@ -87,7 +88,7 @@ public class AuthController : ControllerBase
         // Generate email confirmation token and send email
         var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
         var confirmationLink = Url.Action("ConfirmEmail", "Auth", new { userId = user.Id, token }, Request.Scheme);
-        
+
         var emailBody = $@"
             <h2>Welcome to the Job Trigger Platform!</h2>
             <p>Please confirm your email by clicking the link below:</p>
@@ -236,9 +237,9 @@ public class AuthController : ControllerBase
         }
 
         var qrCodeUri = GenerateQrCodeUri(user.Email, unformattedKey);
-        
-        return Ok(new 
-        { 
+
+        return Ok(new
+        {
             AuthenticatorKey = unformattedKey,
             QrCodeUri = qrCodeUri
         });
@@ -267,7 +268,7 @@ public class AuthController : ControllerBase
         }
 
         await _userManager.SetTwoFactorEnabledAsync(user, true);
-        
+
         // Generate recovery codes
         var recoveryCodes = await _userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
 
@@ -304,7 +305,7 @@ public class AuthController : ControllerBase
     private async Task<string> GenerateJwtToken(ApplicationUser user)
     {
         var userRoles = await _userManager.GetRolesAsync(user);
-        
+
         var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id),
@@ -344,7 +345,7 @@ public class AuthController : ControllerBase
     private string GenerateQrCodeUri(string email, string unformattedKey)
     {
         const string authenticatorUriFormat = "otpauth://totp/{0}:{1}?secret={2}&issuer={0}&digits=6";
-        
+
         return string.Format(
             authenticatorUriFormat,
             Uri.EscapeDataString("JobTriggerPlatform"),
@@ -364,26 +365,26 @@ public class RegisterModel
     [Required]
     [EmailAddress]
     public string Email { get; set; } = string.Empty;
-    
+
     /// <summary>
     /// Gets or sets the first name.
     /// </summary>
     [Required]
     public string FirstName { get; set; } = string.Empty;
-    
+
     /// <summary>
     /// Gets or sets the last name.
     /// </summary>
     [Required]
     public string LastName { get; set; } = string.Empty;
-    
+
     /// <summary>
     /// Gets or sets the password.
     /// </summary>
     [Required]
     [MinLength(8)]
     public string Password { get; set; } = string.Empty;
-    
+
     /// <summary>
     /// Gets or sets the role.
     /// </summary>
@@ -401,13 +402,13 @@ public class LoginModel
     [Required]
     [EmailAddress]
     public string Email { get; set; } = string.Empty;
-    
+
     /// <summary>
     /// Gets or sets the password.
     /// </summary>
     [Required]
     public string Password { get; set; } = string.Empty;
-    
+
     /// <summary>
     /// Gets or sets a value indicating whether to remember the login.
     /// </summary>
@@ -424,12 +425,12 @@ public class TwoFactorModel
     /// </summary>
     [Required]
     public string Code { get; set; } = string.Empty;
-    
+
     /// <summary>
     /// Gets or sets a value indicating whether to remember the login.
     /// </summary>
     public bool RememberMe { get; set; }
-    
+
     /// <summary>
     /// Gets or sets a value indicating whether to remember the client.
     /// </summary>

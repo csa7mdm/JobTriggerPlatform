@@ -3,6 +3,7 @@ using JobTriggerPlatform.Domain.Identity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 
 namespace JobTriggerPlatform.WebApi.Controllers;
@@ -49,7 +50,7 @@ public class JobAccessController : ControllerBase
         {
             var claims = await _userManager.GetClaimsAsync(user);
             var jobAccessClaims = claims.Where(c => c.Type == "JobAccess").Select(c => c.Value).ToList();
-            
+
             result.Add(new
             {
                 user.Id,
@@ -144,7 +145,7 @@ public class JobAccessController : ControllerBase
             await _userManager.AddClaimAsync(user, new Claim("JobAccess", jobName));
         }
 
-        _logger.LogInformation("Updated job access for user {UserId}. Added: {AddedJobs}", 
+        _logger.LogInformation("Updated job access for user {UserId}. Added: {AddedJobs}",
             userId, string.Join(", ", model.JobAccess));
 
         return Ok(new
@@ -199,7 +200,7 @@ public class JobAccessController : ControllerBase
         }
 
         await _userManager.AddClaimAsync(user, new Claim("JobAccess", jobName));
-        
+
         _logger.LogInformation("Added job access {JobName} to user {UserId}", jobName, userId);
 
         return Ok(new
@@ -233,14 +234,14 @@ public class JobAccessController : ControllerBase
 
         var claims = await _userManager.GetClaimsAsync(user);
         var claim = claims.FirstOrDefault(c => c.Type == "JobAccess" && c.Value == jobName);
-        
+
         if (claim == null)
         {
             return BadRequest($"User does not have direct access to job '{jobName}'.");
         }
 
         await _userManager.RemoveClaimAsync(user, claim);
-        
+
         _logger.LogInformation("Removed job access {JobName} from user {UserId}", jobName, userId);
 
         return Ok(new

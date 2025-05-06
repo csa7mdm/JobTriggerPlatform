@@ -3,6 +3,7 @@ using JobTriggerPlatform.WebApi.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
 
 namespace JobTriggerPlatform.WebApi.Controllers;
 
@@ -15,16 +16,19 @@ namespace JobTriggerPlatform.WebApi.Controllers;
 public class TwoFactorController : ControllerBase
 {
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly ILogger<TwoFactorController> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TwoFactorController"/> class.
     /// </summary>
     /// <param name="userManager">The user manager.</param>
+    /// <param name="signInManager">The sign in manager.</param>
     /// <param name="logger">The logger.</param>
-    public TwoFactorController(UserManager<ApplicationUser> userManager, ILogger<TwoFactorController> logger)
+    public TwoFactorController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, ILogger<TwoFactorController> logger)
     {
         _userManager = userManager;
+        _signInManager = signInManager;
         _logger = logger;
     }
 
@@ -44,7 +48,7 @@ public class TwoFactorController : ControllerBase
         return Ok(new
         {
             IsEnabled = await _userManager.GetTwoFactorEnabledAsync(user),
-            IsMachineRemembered = await _userManager.IsTwoFactorClientRememberedAsync(user)
+            IsMachineRemembered = await _signInManager.IsTwoFactorClientRememberedAsync(user)
         });
     }
 
@@ -104,7 +108,7 @@ public class TwoFactorController : ControllerBase
         }
 
         await _userManager.SetTwoFactorEnabledAsync(user, true);
-        
+
         // Generate recovery codes
         var recoveryCodes = await _userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
 
@@ -199,7 +203,7 @@ public class TwoFactorController : ControllerBase
     private string GenerateQrCodeUri(string email, string unformattedKey)
     {
         const string authenticatorUriFormat = "otpauth://totp/{0}:{1}?secret={2}&issuer={0}&digits=6";
-        
+
         return string.Format(
             authenticatorUriFormat,
             Uri.EscapeDataString("JobTriggerPlatform"),

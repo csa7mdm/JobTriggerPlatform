@@ -29,7 +29,7 @@ public class SecurityHeadersMiddleware
     public async Task InvokeAsync(HttpContext context)
     {
         // Set Content Security Policy
-        context.Response.Headers.ContentSecurityPolicy = new StringValues(
+        context.Response.Headers["Content-Security-Policy"] = new StringValues(
             "default-src 'self'; " +
             "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
             "style-src 'self' 'unsafe-inline'; " +
@@ -43,19 +43,19 @@ public class SecurityHeadersMiddleware
             "upgrade-insecure-requests;");
 
         // Prevent content type sniffing
-        context.Response.Headers.XContentTypeOptions = "nosniff";
+        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
 
         // Prevent clickjacking
-        context.Response.Headers.XFrameOptions = "DENY";
+        context.Response.Headers["X-Frame-Options"] = "DENY";
 
         // Referrer policy
-        context.Response.Headers.ReferrerPolicy = "strict-origin-when-cross-origin";
+        context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
 
         // Enables the Cross-site scripting (XSS) filter in the browser
-        context.Response.Headers.XSSProtection = "1; mode=block";
+        context.Response.Headers["X-XSS-Protection"] = "1; mode=block";
 
         // Permissions policy
-        context.Response.Headers.PermissionsPolicy = "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()";
+        context.Response.Headers["Permissions-Policy"] = "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()";
 
         await _next(context);
     }

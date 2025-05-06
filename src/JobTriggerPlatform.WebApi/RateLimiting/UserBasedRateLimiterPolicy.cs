@@ -22,7 +22,7 @@ public class UserBasedRateLimiterPolicy : IRateLimiterPolicy<string>
     /// <param name="queueLimit">The queue limit.</param>
     /// <param name="logger">The logger.</param>
     public UserBasedRateLimiterPolicy(
-        int permitLimit, 
+        int permitLimit,
         int windowInMinutes,
         int queueLimit,
         ILogger<UserBasedRateLimiterPolicy> logger)
@@ -37,7 +37,7 @@ public class UserBasedRateLimiterPolicy : IRateLimiterPolicy<string>
     public RateLimitPartition<string> GetPartition(HttpContext httpContext)
     {
         var userId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
-        
+
         return RateLimitPartition.GetTokenBucketLimiter(userId, key =>
             new TokenBucketRateLimiterOptions
             {
@@ -51,21 +51,39 @@ public class UserBasedRateLimiterPolicy : IRateLimiterPolicy<string>
     }
 
     /// <inheritdoc/>
-    public Func<OnRejectedContext, CancellationToken, ValueTask>? OnRejected => 
+    public Func<OnRejectedContext, CancellationToken, ValueTask>? OnRejected =>
         async (context, token) =>
         {
-            var userId = context.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? 
-                         context.HttpContext.Connection.RemoteIpAddress?.ToString() ?? 
+            var userId = context.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) ??
+                         context.HttpContext.Connection.RemoteIpAddress?.ToString() ??
                          "anonymous";
-                
-            _logger.LogWarning("Rate limit exceeded for user {UserId}. Retry after {RetryAfter}", 
-                userId, context.Lease.RetryAfter);
-            
+
+            _logger.LogWarning("Rate limit exceeded for user {UserId}. Retry after {RetryAfter}",
+                userId, context.Lease.GetRetryAfterMetadata());
+
             context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-            context.HttpContext.Response.Headers.RetryAfter = context.Lease.RetryAfter.ToString();
+
+            // Get retry after metadata if available
+            TimeSpan? retryAfter = null;
+            if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out object? metadataValue) && 
+                metadataValue is TimeSpan timeSpanValue)
+            {
+                retryAfter = timeSpanValue;
+            }
+
+            if (retryAfter.HasValue)
+            {
+                context.HttpContext.Response.Headers.RetryAfter = retryAfter.Value.TotalSeconds.ToString();
+            }
             context.HttpContext.Response.ContentType = "application/json";
-            
-            var json = $"{{ \"error\": \"Too many requests\", \"retryAfter\": \"{context.Lease.RetryAfter}\" }}";
+
+            var json = "{ \"error\": \"Too many requests\"";
+            if (retryAfter.HasValue)
+            {
+                json += $", \"retryAfter\": \"{retryAfter.Value.TotalSeconds}\"";
+            }
+            json += " }";
+
             await context.HttpContext.Response.WriteAsync(json, token);
         };
 }

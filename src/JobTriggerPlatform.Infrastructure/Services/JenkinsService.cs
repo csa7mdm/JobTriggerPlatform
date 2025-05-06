@@ -1,13 +1,12 @@
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
-using System.Text;
-using System.Text.Json;
 using JobTriggerPlatform.Application.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Polly;
-using Polly.Extensions.Http;
 using Polly.Retry;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json;
 
 namespace JobTriggerPlatform.Infrastructure.Services;
 
@@ -38,9 +37,10 @@ public class JenkinsService : IJenkinsService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         // Create retry policy with exponential backoff
-        _retryPolicy = HttpPolicyExtensions
-            .HandleTransientHttpError()
-            .OrResult(msg => msg.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+        _retryPolicy = Policy
+            .Handle<HttpRequestException>()
+            .OrResult<HttpResponseMessage>(r => 
+                (int)r.StatusCode >= 500 || r.StatusCode == System.Net.HttpStatusCode.RequestTimeout)
             .WaitAndRetryAsync(
                 3, // Retry 3 times
                 retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)), // Exponential backoff: 2, 4, 8 seconds
@@ -69,32 +69,32 @@ public class JenkinsService : IJenkinsService
             // Create HTTP client
             var client = _httpClientFactory.CreateClient("JenkinsClient");
             client.BaseAddress = new Uri(jenkinsUrl.TrimEnd('/') + "/");
-            
+
             // Set up token authentication
             var authToken = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{username}:{apiToken}"));
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", authToken);
 
             // Build the URL with parameters
             var urlBuilder = new StringBuilder($"job/{Uri.EscapeDataString(jobName)}/buildWithParameters?");
-            
+
             // Add parameters to the URL
             foreach (var param in parameters)
             {
                 urlBuilder.Append($"{Uri.EscapeDataString(param.Key)}={Uri.EscapeDataString(param.Value)}&");
             }
-            
+
             // Remove the trailing '&'
             var url = urlBuilder.ToString().TrimEnd('&');
-            
+
             // Execute the request with retry policy
             var response = await _retryPolicy.ExecuteAsync(async () =>
             {
                 // Get CSRF crumb if needed
                 await AddCsrfCrumbIfNeededAsync(client, cancellationToken);
-                
+
                 // POST to the Jenkins API
                 var result = await client.PostAsync(url, null, cancellationToken);
-                
+
                 // Log the response details
                 if (!result.IsSuccessStatusCode)
                 {
@@ -104,23 +104,23 @@ public class JenkinsService : IJenkinsService
                         result.StatusCode,
                         content);
                 }
-                
+
                 return result;
             });
-            
+
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                _logger.LogError("Failed to trigger Jenkins build. Status: {StatusCode}, Error: {Error}", 
+                _logger.LogError("Failed to trigger Jenkins build. Status: {StatusCode}, Error: {Error}",
                     response.StatusCode, errorContent);
-                
+
                 return new JenkinsBuildResult
                 {
                     IsSuccessful = false,
                     ErrorMessage = $"Failed to trigger Jenkins build. Status: {response.StatusCode}, Error: {errorContent}"
                 };
             }
-            
+
             // Get the queue item URL from the Location header
             var queueItemUrl = response.Headers.Location;
             if (queueItemUrl == null)
@@ -135,10 +135,10 @@ public class JenkinsService : IJenkinsService
                     BuildUrl = null
                 };
             }
-            
+
             // Wait for the build to start
             var buildInfo = await WaitForBuildToStartAsync(client, queueItemUrl, cancellationToken);
-            
+
             return buildInfo;
         }
         catch (Exception ex)
@@ -157,13 +157,13 @@ public class JenkinsService : IJenkinsService
         try
         {
             // Execute the request with retry policy for getting the crumb
-            var crumbResponse = await _retryPolicy.ExecuteAsync(() => 
+            var crumbResponse = await _retryPolicy.ExecuteAsync(() =>
                 client.GetAsync("crumbIssuer/api/json", cancellationToken));
-            
+
             if (crumbResponse.IsSuccessStatusCode)
             {
                 var crumbData = await crumbResponse.Content.ReadFromJsonAsync<JenkinsCrumb>(cancellationToken);
-                
+
                 if (crumbData != null && !string.IsNullOrEmpty(crumbData.Crumb))
                 {
                     // Remove any existing crumb header and add a new one
@@ -171,15 +171,15 @@ public class JenkinsService : IJenkinsService
                     {
                         client.DefaultRequestHeaders.Remove(crumbData.CrumbRequestField);
                     }
-                    
+
                     client.DefaultRequestHeaders.Add(crumbData.CrumbRequestField, crumbData.Crumb);
-                    _logger.LogDebug("Added CSRF crumb to Jenkins request: {CrumbField}={Crumb}", 
+                    _logger.LogDebug("Added CSRF crumb to Jenkins request: {CrumbField}={Crumb}",
                         crumbData.CrumbRequestField, crumbData.Crumb);
                 }
             }
             else
             {
-                _logger.LogDebug("Failed to get CSRF crumb from Jenkins. Status code: {StatusCode}", 
+                _logger.LogDebug("Failed to get CSRF crumb from Jenkins. Status code: {StatusCode}",
                     crumbResponse.StatusCode);
             }
         }
@@ -195,53 +195,53 @@ public class JenkinsService : IJenkinsService
         var queueItemPath = queueItemUrl.AbsolutePath;
         var queueItemId = queueItemPath.Split('/').Last(s => !string.IsNullOrEmpty(s));
         var queueItemApiUrl = $"queue/item/{queueItemId}/api/json";
-        
+
         // Maximum number of attempts and delay between attempts
         const int maxAttempts = 5;
         var delay = TimeSpan.FromSeconds(2);
-        
+
         for (var attempt = 0; attempt < maxAttempts; attempt++)
         {
             try
             {
                 // Execute the request with retry policy
-                var queueItemResponse = await _retryPolicy.ExecuteAsync(() => 
+                var queueItemResponse = await _retryPolicy.ExecuteAsync(() =>
                     client.GetAsync(queueItemApiUrl, cancellationToken));
-                
+
                 if (!queueItemResponse.IsSuccessStatusCode)
                 {
                     _logger.LogWarning(
                         "Failed to get queue item status. Status code: {StatusCode}. Attempt {Attempt}/{MaxAttempts}",
                         queueItemResponse.StatusCode, attempt + 1, maxAttempts);
-                    
+
                     await Task.Delay(delay, cancellationToken);
                     delay = TimeSpan.FromMilliseconds(delay.TotalMilliseconds * 1.5); // Increase delay by 50%
                     continue;
                 }
-                
+
                 var queueItem = await queueItemResponse.Content.ReadFromJsonAsync<JenkinsQueueItem>(cancellationToken);
-                
+
                 if (queueItem == null)
                 {
-                    _logger.LogWarning("Failed to deserialize Jenkins queue item response. Attempt {Attempt}/{MaxAttempts}", 
+                    _logger.LogWarning("Failed to deserialize Jenkins queue item response. Attempt {Attempt}/{MaxAttempts}",
                         attempt + 1, maxAttempts);
-                    
+
                     await Task.Delay(delay, cancellationToken);
                     delay = TimeSpan.FromMilliseconds(delay.TotalMilliseconds * 1.5);
                     continue;
                 }
-                
+
                 // Check if the build has started
                 if (queueItem.Executable != null)
                 {
                     // Get the build details
                     var buildUrl = queueItem.Executable.Url;
                     var buildApiUrl = $"{buildUrl.TrimEnd('/')}/api/json";
-                    
+
                     // Execute the request with retry policy
-                    var buildResponse = await _retryPolicy.ExecuteAsync(() => 
+                    var buildResponse = await _retryPolicy.ExecuteAsync(() =>
                         client.GetAsync(buildApiUrl, cancellationToken));
-                    
+
                     if (buildResponse.IsSuccessStatusCode)
                     {
                         var buildData = await buildResponse.Content.ReadFromJsonAsync<JenkinsBuild>(
@@ -250,13 +250,13 @@ public class JenkinsService : IJenkinsService
                             {
                                 PropertyNameCaseInsensitive = true
                             });
-                        
+
                         if (buildData != null)
                         {
                             _logger.LogInformation(
                                 "Jenkins build started. Build number: {BuildNumber}, URL: {BuildUrl}",
                                 buildData.Number, buildData.Url);
-                            
+
                             return new JenkinsBuildResult
                             {
                                 IsSuccessful = true,
@@ -267,12 +267,12 @@ public class JenkinsService : IJenkinsService
                             };
                         }
                     }
-                    
+
                     // If we couldn't get the build details, return a basic result
                     _logger.LogInformation(
                         "Jenkins build started but details not available. Build number: {BuildNumber}, URL: {BuildUrl}",
                         queueItem.Executable.Number, queueItem.Executable.Url);
-                    
+
                     return new JenkinsBuildResult
                     {
                         IsSuccessful = true,
@@ -282,30 +282,30 @@ public class JenkinsService : IJenkinsService
                         EstimatedDuration = 0
                     };
                 }
-                
+
                 _logger.LogDebug(
                     "Build not yet started. Queue item: {QueueItemId}, Waiting before checking again. Attempt {Attempt}/{MaxAttempts}",
                     queueItemId, attempt + 1, maxAttempts);
-                
+
                 // Wait before checking again
                 await Task.Delay(delay, cancellationToken);
                 delay = TimeSpan.FromMilliseconds(delay.TotalMilliseconds * 1.5);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error waiting for Jenkins build to start. Attempt {Attempt}/{MaxAttempts}", 
+                _logger.LogError(ex, "Error waiting for Jenkins build to start. Attempt {Attempt}/{MaxAttempts}",
                     attempt + 1, maxAttempts);
-                
+
                 await Task.Delay(delay, cancellationToken);
                 delay = TimeSpan.FromMilliseconds(delay.TotalMilliseconds * 1.5);
             }
         }
-        
+
         // If we couldn't get the build details after several attempts, return a basic successful result
         _logger.LogWarning(
             "Could not determine build details after {MaxAttempts} attempts. Assuming build was triggered successfully.",
             maxAttempts);
-        
+
         return new JenkinsBuildResult
         {
             IsSuccessful = true,

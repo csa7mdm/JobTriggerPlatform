@@ -1,7 +1,5 @@
-using FluentValidation;
 using JobTriggerPlatform.Application.Abstractions;
 using JobTriggerPlatform.Infrastructure.Authorization;
-using JobTriggerPlatform.WebApi.Extensions;
 using JobTriggerPlatform.WebApi.Models;
 using JobTriggerPlatform.WebApi.OpenApi;
 using Microsoft.AspNetCore.Authorization;
@@ -81,9 +79,9 @@ public static class JobEndpoints
     {
         var userRoles = user.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
         var jobAccessClaims = user.FindAll("JobAccess").Select(c => c.Value).ToList();
-        
+
         var accessibleJobs = plugins
-            .Where(p => 
+            .Where(p =>
                 // User has direct job access via claim
                 jobAccessClaims.Contains(p.JobName) ||
                 // User has a role that is required for the job
@@ -150,8 +148,9 @@ public static class JobEndpoints
         string name,
         [FromBody] JobTriggerRequest request,
         [FromServices] IEnumerable<IJobTriggerPlugin> plugins,
-        [FromServices] ILogger<JobEndpoints> logger)
+        [FromServices] ILogger logger)
     {
+        ArgumentNullException.ThrowIfNull(logger);
         var plugin = plugins.FirstOrDefault(p => p.JobName == name);
         if (plugin == null)
         {
@@ -170,15 +169,15 @@ public static class JobEndpoints
             }
 
             logger.LogInformation("Triggering job {JobName} with parameters: {@Parameters}", name, request.Parameters);
-            
+
             var result = await plugin.TriggerAsync(request.Parameters);
-            
+
             if (result.IsSuccess)
             {
                 // Add to job history (in a real application, this would be stored in a database)
                 // This is a placeholder for demonstration purposes
                 logger.LogInformation("Job {JobName} completed successfully: {@Result}", name, result);
-                
+
                 return Results.Ok(new
                 {
                     Success = true,
@@ -191,7 +190,7 @@ public static class JobEndpoints
             else
             {
                 logger.LogWarning("Job {JobName} failed: {ErrorMessage}", name, result.ErrorMessage);
-                
+
                 return Results.BadRequest(new
                 {
                     Success = false,
@@ -286,7 +285,7 @@ public static class JobEndpoints
     {
         // In a real application, this would fetch from a database
         // This is a placeholder for demonstration purposes
-        return Results.Ok(new[]
+        return Results.Ok(new object[]
         {
             new {
                 JobName = "SampleJob",
@@ -331,7 +330,7 @@ public static class JobEndpoints
         // This is a placeholder for demonstration purposes
         if (name == "SampleJob")
         {
-            return Results.Ok(new[]
+            return Results.Ok(new object[]
             {
                 new {
                     JobName = "SampleJob",
@@ -362,7 +361,7 @@ public static class JobEndpoints
         }
         else if (name == "AdvancedDeployment")
         {
-            return Results.Ok(new[]
+            return Results.Ok(new object[]
             {
                 new {
                     JobName = "AdvancedDeployment",
