@@ -79,3 +79,4 @@ Thumbs.db
 /Fix-BuildIssues.ps1
 /Test-NuGetWithProxy.ps1
 /FixNuGetIssue.ps1
+/frontend/pnpm-lock.yaml

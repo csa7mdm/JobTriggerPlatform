@@ -15,6 +15,13 @@ A secure, plugin-based deployment portal for managing automated jobs across mult
   - [Prerequisites](#prerequisites)
   - [Development Setup](#development-setup)
   - [Running Locally](#running-locally)
+- [Authentication & Testing](#authentication--testing)
+  - [Test Authentication Tools](#test-authentication-tools)
+  - [Default Test Users](#default-test-users)
+  - [Using Authentication Tokens](#using-authentication-tokens)
+- [Database Management](#database-management)
+  - [Migrations](#migrations)
+  - [Seeding Data](#seeding-data)
 - [Plugin Development Guide](#plugin-development-guide)
   - [Creating a Backend Plugin](#creating-a-backend-plugin)
   - [Creating a Frontend Plugin](#creating-a-frontend-plugin)
@@ -37,6 +44,8 @@ Key features:
 - Support for multiple deployment environments
 - Containerized deployment with Docker
 - Infrastructure as Code with Terraform
+- Automatic database migrations
+- Test users and authentication tools for development
 
 ## Architecture
 
@@ -119,7 +128,7 @@ The platform includes comprehensive security features:
 - Axios for API communication
 
 **Backend:**
-- ASP.NET Core 8 Web API
+- ASP.NET Core 9 Web API
 - Entity Framework Core
 - Identity with JWT authentication
 - PostgreSQL for data storage
@@ -135,10 +144,11 @@ The platform includes comprehensive security features:
 
 ### Prerequisites
 
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
 - [Node.js](https://nodejs.org/) (v18 or later)
 - [Docker](https://www.docker.com/get-started) and Docker Compose
 - [Git](https://git-scm.com/downloads)
+- [PostgreSQL](https://www.postgresql.org/download/) (for local development)
 - [Terraform](https://www.terraform.io/downloads.html) (for cloud deployment)
 
 ### Development Setup
@@ -156,7 +166,16 @@ The platform includes comprehensive security features:
    dotnet build
    ```
 
-3. Set up the frontend:
+3. Update database connection string:
+   - Open `appsettings.Development.json`
+   - Update the `ConnectionStrings:DefaultConnection` with your PostgreSQL credentials
+
+4. Apply database migrations:
+   ```bash
+   dotnet ef database update
+   ```
+
+5. Set up the frontend:
    ```bash
    cd ../../frontend
    npm install
@@ -196,6 +215,127 @@ dotnet run
 cd frontend
 npm run dev
 ```
+
+## Authentication & Testing
+
+### Test Authentication Tools
+
+For development and testing purposes, we've added special tools to make authentication easier in development environments:
+
+#### Web-Based Test Authentication
+
+A browser-based testing interface is available at:
+```
+https://localhost:54011/test-auth.html
+```
+
+This page provides buttons to easily get JWT tokens for different roles (Admin, Operator, Viewer) without needing to go through the full authentication process.
+
+#### Test Authentication API
+
+A special test authentication API is available in development mode:
+
+```
+GET https://localhost:54011/api/TestAuth/login/{role}
+```
+
+Where `{role}` can be:
+- `admin` - Admin role with full access
+- `operator` - Operator role with access to deployment operations
+- `viewer` - Viewer role with read-only access
+
+Example using curl:
+```bash
+curl -X GET "https://localhost:54011/api/TestAuth/login/admin"
+```
+
+This will return a JWT token you can use for testing.
+
+### Default Test Users
+
+The system automatically seeds the following test users on startup:
+
+| Email | Password | Role | Permissions |
+|-------|----------|------|-------------|
+| admin@example.com | Password123! | Admin | Full access (view and manage all jobs) |
+| operator@example.com | Password123! | Operator | Can view all jobs and perform deployment operations |
+| viewer@example.com | Password123! | Viewer | Can only view the list of deployment jobs |
+
+> **Note**: These users are created automatically during development. In production, you will need to create users through the registration process.
+
+### Using Authentication Tokens
+
+To use the JWT token with API requests:
+
+1. **With Postman:**
+   - Create a new request
+   - Go to the "Authorization" tab
+   - Select "Bearer Token" from the Type dropdown
+   - Paste your token into the Token field
+   - Send your request
+
+2. **With curl:**
+   ```bash
+   curl -X GET "https://localhost:54011/api/jobs" -H "Authorization: Bearer YOUR_TOKEN_HERE"
+   ```
+
+3. **In JavaScript:**
+   ```javascript
+   fetch('https://localhost:54011/api/jobs', {
+     headers: {
+       'Authorization': `Bearer ${token}`
+     }
+   })
+   .then(response => response.json())
+   .then(data => console.log(data));
+   ```
+
+## Database Management
+
+### Migrations
+
+The application uses Entity Framework Core migrations to manage the database schema. Migrations are applied automatically when the application starts.
+
+#### Creating a Migration
+
+To create a new migration, run:
+
+```bash
+cd src/JobTriggerPlatform.WebApi
+dotnet ef migrations add [MigrationName] --project ../JobTriggerPlatform.Infrastructure --startup-project .
+```
+
+Replace `[MigrationName]` with a descriptive name for your migration, for example:
+
+```bash
+dotnet ef migrations add AddJobHistoryTable --project ../JobTriggerPlatform.Infrastructure --startup-project .
+```
+
+#### Applying Migrations Manually
+
+The application is configured to automatically apply pending migrations when it starts up. However, if you need to apply migrations manually, you can use:
+
+```bash
+dotnet ef database update --project ../JobTriggerPlatform.Infrastructure --startup-project .
+```
+
+For more detailed information about migrations, see [MIGRATIONS.md](./MIGRATIONS.md).
+
+### Seeding Data
+
+The application automatically seeds the following data on startup:
+
+1. **Roles:**
+   - Admin - Full access to all platform features
+   - Operator - Access to deployment operations
+   - Viewer - Read-only access to view deployment jobs
+
+2. **Users:**
+   - admin@example.com / Password123! (Admin role)
+   - operator@example.com / Password123! (Operator role)
+   - viewer@example.com / Password123! (Viewer role)
+
+This seeding only occurs in the development environment. In production, you will need to create users and assign roles through the application's user management interface.
 
 ## Plugin Development Guide
 
@@ -416,6 +556,7 @@ The platform implements several security best practices:
    - JWT tokens with short expiration times
    - Role-based access control
    - Optional 2FA authentication
+   - Development-only test authentication tools
 
 2. **Data Protection:**
    - HTTPS enforcement
@@ -434,6 +575,11 @@ The platform implements several security best practices:
    - Private networking between services
    - WAF protection with Cloud Armor
    - Secure container configuration
+
+5. **Database Security:**
+   - Automatic migrations with schema versioning
+   - Parameterized queries to prevent SQL injection
+   - Dedicated database schema for Identity tables
 
 ## License
 
