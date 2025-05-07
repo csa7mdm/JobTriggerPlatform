@@ -21,14 +21,14 @@ public class RoleSeeder
         public const string Admin = "Admin";
         
         /// <summary>
-        /// Developer role with access to deployment and job configurations.
+        /// Operator role with permissions to perform deployment operations.
         /// </summary>
-        public const string Dev = "Dev";
+        public const string Operator = "Operator";
         
         /// <summary>
-        /// Quality Assurance role with access to trigger jobs and view results.
+        /// Viewer role with read-only access to the platform.
         /// </summary>
-        public const string QA = "QA";
+        public const string Viewer = "Viewer";
     }
 
     /// <summary>
@@ -45,8 +45,8 @@ public class RoleSeeder
         logger.LogInformation("Seeding roles");
 
         await CreateRoleIfNotExistsAsync(roleManager, Roles.Admin, "Full access to all platform features");
-        await CreateRoleIfNotExistsAsync(roleManager, Roles.Dev, "Access to deployment configuration and management");
-        await CreateRoleIfNotExistsAsync(roleManager, Roles.QA, "Access to trigger jobs and view results");
+        await CreateRoleIfNotExistsAsync(roleManager, Roles.Operator, "Access to deployment operations");
+        await CreateRoleIfNotExistsAsync(roleManager, Roles.Viewer, "Read-only access to view deployment jobs");
     }
 
     private static async Task CreateRoleIfNotExistsAsync(RoleManager<ApplicationRole> roleManager, string roleName, string description)

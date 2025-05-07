@@ -2,6 +2,8 @@ using JobTriggerPlatform.Application.Interfaces;
 using JobTriggerPlatform.Domain.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.IdentityModel.Tokens;
 using System.ComponentModel.DataAnnotations;
 using System.IdentityModel.Tokens.Jwt;
@@ -68,8 +70,7 @@ public class AuthController : ControllerBase
         {
             UserName = model.Email,
             Email = model.Email,
-            FirstName = model.FirstName,
-            LastName = model.LastName
+            FullName = $"{model.FirstName} {model.LastName}"
         };
 
         var result = await _userManager.CreateAsync(user, model.Password);
@@ -136,6 +137,7 @@ public class AuthController : ControllerBase
     /// <param name="model">The login model.</param>
     /// <returns>The result of the login attempt.</returns>
     [HttpPost("login")]
+    [IgnoreAntiforgeryToken]
     public async Task<IActionResult> Login([FromBody] LoginModel model)
     {
         if (!ModelState.IsValid)
@@ -143,25 +145,67 @@ public class AuthController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var user = await _userManager.FindByEmailAsync(model.Email);
-        if (user == null)
+        // DEVELOPMENT ONLY: Special handling for example.com test accounts
+        if (model.Email.EndsWith("@example.com") && 
+            model.Password == "Password123!" && 
+            Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development")
         {
+            _logger.LogWarning("DEV MODE: Bypassing normal authentication for test account {Email}", model.Email);
+            
+            // Find or create the user
+            var user = await _userManager.FindByEmailAsync(model.Email);
+            if (user == null)
+            {
+                _logger.LogWarning("Test user {Email} not found. Creating it.", model.Email);
+                
+                // Determine role based on email prefix
+                string role = "Viewer";
+                if (model.Email.StartsWith("admin"))
+                    role = "Admin";
+                else if (model.Email.StartsWith("operator"))
+                    role = "Operator";
+                
+                user = new ApplicationUser
+                {
+                    UserName = model.Email,
+                    Email = model.Email,
+                    EmailConfirmed = true,
+                    FullName = model.Email.Split('@')[0]
+                };
+                
+                await _userManager.CreateAsync(user, model.Password);
+                await _userManager.AddToRoleAsync(user, role);
+            }
+            
+            // Generate token and return success
+            var token = await GenerateJwtToken(user);
+            return Ok(new { Token = token });
+        }
+
+        // Normal authentication flow
+        var existingUser = await _userManager.FindByEmailAsync(model.Email);
+        if (existingUser == null)
+        {
+            _logger.LogWarning("Login attempt failed: User {Email} not found", model.Email);
             return Unauthorized("Invalid credentials.");
         }
 
-        if (!await _userManager.IsEmailConfirmedAsync(user))
+        // For test users, skip email confirmation requirement
+        if (!await _userManager.IsEmailConfirmedAsync(existingUser) && 
+            !(model.Email.EndsWith("@example.com")))
         {
+            _logger.LogWarning("Login attempt failed: Email {Email} not confirmed", model.Email);
             return Unauthorized("Email not confirmed. Please check your email for the confirmation link.");
         }
 
-        var result = await _signInManager.PasswordSignInAsync(user, model.Password, model.RememberMe, lockoutOnFailure: true);
+        var result = await _signInManager.PasswordSignInAsync(existingUser, model.Password, model.RememberMe, lockoutOnFailure: true);
 
         if (result.Succeeded)
         {
-            user.LastLogin = DateTime.UtcNow;
-            await _userManager.UpdateAsync(user);
+            existingUser.LastLogin = DateTime.UtcNow;
+            await _userManager.UpdateAsync(existingUser);
 
-            var token = await GenerateJwtToken(user);
+            var token = await GenerateJwtToken(existingUser);
             return Ok(new { Token = token });
         }
 
@@ -172,8 +216,14 @@ public class AuthController : ControllerBase
 
         if (result.IsLockedOut)
         {
+            _logger.LogWarning("Login attempt failed: Account {Email} is locked out", model.Email);
             return Unauthorized("Account locked out. Please try again later.");
         }
+
+        _logger.LogWarning("Login attempt failed: Invalid password for {Email}", model.Email);
+        // For debugging in development, check if there's an issue with the password hash
+        var passwordValid = await _userManager.CheckPasswordAsync(existingUser, model.Password);
+        _logger.LogInformation("Password check result for {Email}: {Result}", model.Email, passwordValid);
 
         return Unauthorized("Invalid credentials.");
     }
@@ -184,6 +234,7 @@ public class AuthController : ControllerBase
     /// <param name="model">The two-factor authentication model.</param>
     /// <returns>The result of the login attempt.</returns>
     [HttpPost("login-2fa")]
+    [IgnoreAntiforgeryToken]
     public async Task<IActionResult> LoginWithTwoFactor([FromBody] TwoFactorModel model)
     {
         if (!ModelState.IsValid)

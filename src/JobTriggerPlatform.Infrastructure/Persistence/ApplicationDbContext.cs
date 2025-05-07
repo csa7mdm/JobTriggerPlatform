@@ -25,37 +25,37 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         // Customize the ASP.NET Identity model and override table names
         builder.Entity<ApplicationUser>(entity =>
         {
-            entity.ToTable("Users");
+            entity.ToTable("Users", "identity");
         });
 
         builder.Entity<ApplicationRole>(entity =>
         {
-            entity.ToTable("Roles");
+            entity.ToTable("Roles", "identity");
         });
 
         builder.Entity<Microsoft.AspNetCore.Identity.IdentityUserRole<string>>(entity =>
         {
-            entity.ToTable("UserRoles");
+            entity.ToTable("UserRoles", "identity");
         });
 
         builder.Entity<Microsoft.AspNetCore.Identity.IdentityUserClaim<string>>(entity =>
         {
-            entity.ToTable("UserClaims");
+            entity.ToTable("UserClaims", "identity");
         });
 
         builder.Entity<Microsoft.AspNetCore.Identity.IdentityUserLogin<string>>(entity =>
         {
-            entity.ToTable("UserLogins");
+            entity.ToTable("UserLogins", "identity");
         });
 
         builder.Entity<Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>>(entity =>
         {
-            entity.ToTable("RoleClaims");
+            entity.ToTable("RoleClaims", "identity");
         });
 
         builder.Entity<Microsoft.AspNetCore.Identity.IdentityUserToken<string>>(entity =>
         {
-            entity.ToTable("UserTokens");
+            entity.ToTable("UserTokens", "identity");
         });
     }
 }

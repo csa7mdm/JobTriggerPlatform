@@ -146,7 +146,7 @@ public class RolesController : ControllerBase
         }
 
         // Check if role is one of the predefined roles
-        if (role.Name == "Admin" || role.Name == "Dev" || role.Name == "QA")
+        if (role.Name == "Admin" || role.Name == "Operator" || role.Name == "Viewer")
         {
             return BadRequest("Cannot delete predefined roles.");
         }
@@ -177,8 +177,7 @@ public class RolesController : ControllerBase
             {
                 user.Id,
                 user.Email,
-                user.FirstName,
-                user.LastName,
+                user.FullName,
                 user.CreatedAt,
                 user.LastLogin,
                 Roles = roles
@@ -220,8 +219,7 @@ public class RolesController : ControllerBase
         {
             user.Id,
             user.Email,
-            user.FirstName,
-            user.LastName,
+            user.FullName,
             Roles = model.Roles
         });
     }

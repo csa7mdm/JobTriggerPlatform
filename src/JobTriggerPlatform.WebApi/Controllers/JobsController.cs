@@ -40,6 +40,7 @@ public class JobsController : ControllerBase
     /// </summary>
     /// <returns>The list of job plugins.</returns>
     [HttpGet]
+    [Authorize(Policy = "ViewDeploymentJobs")]
     public IActionResult GetJobs()
     {
         var userRoles = User.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
@@ -61,6 +62,7 @@ public class JobsController : ControllerBase
     /// <param name="jobName">The job name.</param>
     /// <returns>The job plugin details.</returns>
     [HttpGet("{jobName}")]
+    [Authorize(Policy = "ViewDeploymentJobs")]
     public async Task<IActionResult> GetJob(string jobName)
     {
         // Use our custom JobAccessRequirement for authorization
@@ -92,6 +94,7 @@ public class JobsController : ControllerBase
     /// <param name="parameters">The job parameters.</param>
     /// <returns>The result of the job trigger.</returns>
     [HttpPost("{jobName}/trigger")]
+    [Authorize(Policy = "ManageDeploymentJobs")]
     public async Task<IActionResult> TriggerJob(string jobName, [FromBody] Dictionary<string, string> parameters)
     {
         // Use our custom JobAccessRequirement for authorization

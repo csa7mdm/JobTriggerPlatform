@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Logging;
 using System;
@@ -125,7 +126,7 @@ try
         options.Secure = CookieSecurePolicy.Always;
     });
 
-    // Configure JWT Authentication
+    // Configure Authentication with support for both Identity cookies and JWT
     builder.Services.AddAuthentication(options =>
     {
         options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -172,15 +173,18 @@ try
     // Set up default authorization policies
     var authBuilder = builder.Services.AddAuthorizationBuilder()
         .AddPolicy("RequireAdminRole", policy => policy.RequireRole("Admin"))
-        .AddPolicy("RequireDevRole", policy => policy.RequireRole("Dev"))
-        .AddPolicy("RequireQARole", policy => policy.RequireRole("QA"));
+        .AddPolicy("RequireOperatorRole", policy => policy.RequireRole("Operator"))
+        .AddPolicy("RequireViewerRole", policy => policy.RequireRole("Viewer"));
 
-    // Create policies for job access
-    authBuilder.AddPolicy("JobAccess:SampleJob", policy =>
-        policy.AddRequirements(new JobAccessRequirement("SampleJob")));
-
-    authBuilder.AddPolicy("JobAccess:AdvancedDeployment", policy =>
-        policy.AddRequirements(new JobAccessRequirement("AdvancedDeployment")));
+    // Create access policies for roles
+    authBuilder.AddPolicy("ViewDeploymentJobs", policy => 
+        policy.RequireRole("Admin", "Operator", "Viewer"));
+        
+    authBuilder.AddPolicy("ManageDeploymentJobs", policy => 
+        policy.RequireRole("Admin", "Operator"));
+        
+    authBuilder.AddPolicy("AdminJobs", policy => 
+        policy.RequireRole("Admin"));
         
     // Add a fallback policy
     builder.Services.AddAuthorization(options =>
@@ -277,6 +281,8 @@ try
         app.UseHsts();
     }
 
+    app.UseStaticFiles();
+
     // Use cookie policy
     app.UseCookiePolicy();
 
@@ -315,14 +321,14 @@ try
     // Apply rate limiting to controller endpoints
     controllerEndpoints.RequireRateLimiting("Concurrency");
 
-    // Map job endpoints
-    var jobEndpoints = app.MapJobEndpoints();
+    // Comment out the minimal API job endpoints to avoid route conflicts
+    // var jobEndpoints = app.MapJobEndpoints();
     
     // For each job endpoint, apply rate limiting
-    foreach (var endpoint in jobEndpoints)
-    {
-        endpoint.RequireRateLimiting("Global");
-    }
+    // foreach (var endpoint in jobEndpoints)
+    // {
+    //     endpoint.RequireRateLimiting("Global");
+    // }
 
     // Map root endpoint
     var rootGroup = app.MapGroup("/");
@@ -331,12 +337,22 @@ try
         .WithTags("Root")
         .RequireRateLimiting("Global");
 
-    // Seed roles
+    // Apply database migrations and initialize database
+    await DatabaseInitializer.InitializeDatabaseAsync(app.Services);
+
+    // Seed roles and users
     try
     {
         using var scope = app.Services.CreateScope();
-        var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
+        
+        // Verify role manager is registered
+        if (scope.ServiceProvider.GetService<RoleManager<ApplicationRole>>() == null)
+        {
+            throw new InvalidOperationException("RoleManager<ApplicationRole> is not registered in the service container.");
+        }
+        
         await RoleSeeder.SeedRolesAsync(app.Services);
+        await UserSeeder.SeedUsersAsync(app.Services);
 
         // Log the loaded plugins
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
@@ -351,6 +367,7 @@ try
     catch (Exception ex)
     {
         Console.WriteLine($"An error occurred while seeding roles or configuring authorization: {ex.Message}");
+        Console.WriteLine(ex.StackTrace); // Add stack trace for better debugging
     }
 
     app.Run();

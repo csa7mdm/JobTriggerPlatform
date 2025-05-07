@@ -55,8 +55,7 @@ public class JobAccessController : ControllerBase
             {
                 user.Id,
                 user.Email,
-                user.FirstName,
-                user.LastName,
+                user.FullName,
                 JobAccess = jobAccessClaims
             });
         }
@@ -92,8 +91,7 @@ public class JobAccessController : ControllerBase
         {
             user.Id,
             user.Email,
-            user.FirstName,
-            user.LastName,
+            user.FullName,
             DirectJobAccess = jobAccessClaims,
             RoleBasedJobAccess = accessibleJobsByRole
         });

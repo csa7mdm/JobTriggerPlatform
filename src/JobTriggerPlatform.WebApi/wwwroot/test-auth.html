@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Authentication</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        button {
+            padding: 10px 15px;
+            margin: 5px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .token-container {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Authentication</h1>
+    <p>Click one of the buttons below to get a JWT token for a specific role:</p>
+    
+    <div>
+        <button onclick="getToken('admin')">Get Admin Token</button>
+        <button onclick="getToken('operator')">Get Operator Token</button>
+        <button onclick="getToken('viewer')">Get Viewer Token</button>
+    </div>
+    
+    <div class="token-container">
+        <h2>Token:</h2>
+        <pre id="token-output">No token yet. Click a button above.</pre>
+    </div>
+    
+    <script>
+        async function getToken(role) {
+            try {
+                const response = await fetch(`/api/TestAuth/login/${role}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                document.getElementById('token-output').textContent = data.token;
+                
+                // Copy to clipboard
+                navigator.clipboard.writeText(data.token)
+                    .then(() => {
+                        alert('Token copied to clipboard!');
+                    })
+                    .catch(err => {
+                        console.error('Could not copy text: ', err);
+                    });
+            } catch (error) {
+                document.getElementById('token-output').textContent = `Error: ${error.message}`;
+                console.error('Error:', error);
+            }
+        }
+    </script>
+</body>
+</html>

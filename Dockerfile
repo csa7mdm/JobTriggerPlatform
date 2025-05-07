@@ -1,5 +1,5 @@
 # Build stage for .NET WebApi project
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /app
 
 # Copy csproj files and restore as distinct layers

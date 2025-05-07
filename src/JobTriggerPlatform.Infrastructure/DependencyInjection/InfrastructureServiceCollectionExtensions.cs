@@ -7,9 +7,11 @@ using JobTriggerPlatform.Infrastructure.Persistence;
 using JobTriggerPlatform.Infrastructure.Plugins;
 using JobTriggerPlatform.Infrastructure.Services;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Polly;
 using System.Net;
 
@@ -38,15 +40,28 @@ namespace JobTriggerPlatform.Infrastructure.DependencyInjection
                     configuration.GetConnectionString("DefaultConnection"),
                     b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
 
-            // Register Identity
-            services.AddIdentityCore<ApplicationUser>(options =>
+            // Register Identity with complete services (including RoleManager)
+            services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
                 {
-                    // Password settings
+                // Configure identity options based on environment
+                if (configuration.GetValue<bool>("UseStrictPasswordPolicy", true))
+                {
+                    // Standard password settings
                     options.Password.RequireDigit = true;
                     options.Password.RequireLowercase = true;
                     options.Password.RequireUppercase = true;
                     options.Password.RequireNonAlphanumeric = true;
                     options.Password.RequiredLength = 8;
+                }
+                else
+                {
+                    // Relaxed password settings for development
+                    options.Password.RequireDigit = false;
+                    options.Password.RequireLowercase = false;
+                    options.Password.RequireUppercase = false;
+                    options.Password.RequireNonAlphanumeric = false;
+                    options.Password.RequiredLength = 6;
+                }
 
                     // Lockout settings
                     options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
@@ -56,14 +71,17 @@ namespace JobTriggerPlatform.Infrastructure.DependencyInjection
                     options.User.RequireUniqueEmail = true;
 
                     // Email confirmation settings
-                    options.SignIn.RequireConfirmedEmail = true;
+                    options.SignIn.RequireConfirmedEmail = false;
 
                     // Two-factor authentication settings
-                    options.SignIn.RequireConfirmedAccount = true;
-                    options.SignIn.RequireConfirmedEmail = true;
+                    options.SignIn.RequireConfirmedAccount = false;
                 })
                 .AddEntityFrameworkStores<ApplicationDbContext>()
-                .AddDefaultTokenProviders();
+                .AddDefaultTokenProviders()
+                .AddRoleManager<RoleManager<ApplicationRole>>();
+                
+            // Ensure RoleManager is explicitly registered as a fallback
+            services.AddScoped<RoleManager<ApplicationRole>>();
 
             // Register Email Service
             services.Configure<EmailSettings>(configuration.GetSection("EmailSettings"));

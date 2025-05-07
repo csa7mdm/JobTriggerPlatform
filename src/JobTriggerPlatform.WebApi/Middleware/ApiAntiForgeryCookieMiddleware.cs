@@ -35,10 +35,11 @@ public class ApiAntiForgeryCookieMiddleware
     /// <returns>A task representing the asynchronous operation.</returns>
     public async Task InvokeAsync(HttpContext context)
     {
-        // Exclude OPTIONS requests and Swagger requests from anti-forgery check
+        // Exclude OPTIONS requests, Swagger requests, and Auth endpoints from anti-forgery check
         var path = context.Request.Path.Value?.ToLowerInvariant() ?? "";
         if (context.Request.Method == HttpMethods.Options ||
-            path.StartsWith("/swagger"))
+            path.StartsWith("/swagger") ||
+            path.StartsWith("/api/auth/"))
         {
             await _next(context);
             return;

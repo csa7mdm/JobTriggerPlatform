@@ -9,14 +9,9 @@ namespace JobTriggerPlatform.Domain.Identity;
 public class ApplicationUser : IdentityUser
 {
     /// <summary>
-    /// Gets or sets the first name of the user.
+    /// Gets or sets the full name of the user.
     /// </summary>
-    public string? FirstName { get; set; }
-
-    /// <summary>
-    /// Gets or sets the last name of the user.
-    /// </summary>
-    public string? LastName { get; set; }
+    public string? FullName { get; set; }
 
     /// <summary>
     /// Gets or sets the date when the user was created.
