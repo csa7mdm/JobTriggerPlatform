@@ -1,0 +1,71 @@
+name: Test Coverage
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 9.0.x
+        
+    - name: Restore dependencies
+      run: dotnet restore
+      
+    - name: Build
+      run: dotnet build --no-restore
+      
+    - name: Test with coverage
+      run: dotnet test --no-build --verbosity normal /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura
+      
+    - name: Generate coverage report
+      uses: danielpalme/ReportGenerator-GitHub-Action@4.8.12
+      with:
+        reports: '**/coverage.cobertura.xml'
+        targetdir: 'coverage-report'
+        reporttypes: 'HtmlInline;Cobertura'
+        
+    - name: Upload coverage report
+      uses: actions/upload-artifact@v2
+      with:
+        name: coverage-report
+        path: coverage-report
+        
+    - name: Coverage verification
+      uses: danielpalme/ReportGenerator-GitHub-Action@4.8.12
+      with:
+        reports: '**/coverage.cobertura.xml'
+        targetdir: 'coverage-verification'
+        reporttypes: 'Cobertura'
+        assemblyfilters: '+JobTriggerPlatform.*'
+        
+    - name: Check coverage
+      uses: danielpalme/ReportGenerator-GitHub-Action@4.8.12
+      with:
+        reports: 'coverage-verification/Cobertura.xml'
+        targetdir: 'coverage-check'
+        reporttypes: 'TextSummary'
+        
+    - name: Display coverage
+      run: cat coverage-check/Summary.txt
+      
+    - name: Verify minimum coverage
+      run: |
+        LINE_COVERAGE=$(grep -oP 'Line coverage: \K[0-9.]+' coverage-check/Summary.txt | tr -d '.')
+        if [ "$LINE_COVERAGE" -lt 7000 ]; then
+          echo "Code coverage is below 70%: $LINE_COVERAGE"
+          exit 1
+        else
+          echo "Code coverage is at or above 70%: $LINE_COVERAGE"
+        fi

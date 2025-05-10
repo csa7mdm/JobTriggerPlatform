@@ -7,6 +7,25 @@ using System.ComponentModel.DataAnnotations;
 
 namespace JobTriggerPlatform.WebApi.Controllers;
 
+public class TwoFactorStatusResponse
+{
+    public bool IsEnabled { get; set; }
+    public bool IsMachineRemembered { get; set; }
+}
+
+public class AuthenticatorKeyResponse
+{
+    public string AuthenticatorKey { get; set; } = string.Empty;
+    public string QrCodeUri { get; set; } = string.Empty;
+    public string QrCodeBase64 { get; set; } = string.Empty;
+}
+
+public class TwoFactorResponse
+{
+    public IEnumerable<string>? RecoveryCodes { get; set; }
+    public string Message { get; set; } = string.Empty;
+}
+
 /// <summary>
 /// Controller for managing two-factor authentication.
 /// </summary>
@@ -45,7 +64,7 @@ public class TwoFactorController : ControllerBase
             return Unauthorized("User not found.");
         }
 
-        return Ok(new
+        return Ok(new TwoFactorStatusResponse
         {
             IsEnabled = await _userManager.GetTwoFactorEnabledAsync(user),
             IsMachineRemembered = await _signInManager.IsTwoFactorClientRememberedAsync(user)
@@ -77,7 +96,7 @@ public class TwoFactorController : ControllerBase
         var authenticatorUri = GenerateQrCodeUri(user.Email, unformattedKey);
         var qrCodeBase64 = QrCodeGenerator.GenerateQrCodeAsBase64(authenticatorUri);
 
-        return Ok(new
+        return Ok(new AuthenticatorKeyResponse
         {
             AuthenticatorKey = unformattedKey,
             QrCodeUri = authenticatorUri,
@@ -114,7 +133,7 @@ public class TwoFactorController : ControllerBase
 
         _logger.LogInformation("User {UserId} has enabled 2FA with an authenticator app", user.Id);
 
-        return Ok(new
+        return Ok(new TwoFactorResponse
         {
             RecoveryCodes = recoveryCodes,
             Message = "Two-factor authentication has been enabled."
@@ -142,7 +161,7 @@ public class TwoFactorController : ControllerBase
 
         _logger.LogInformation("User {UserId} has disabled 2FA", user.Id);
 
-        return Ok(new
+        return Ok(new TwoFactorResponse
         {
             Message = "Two-factor authentication has been disabled."
         });
@@ -170,7 +189,7 @@ public class TwoFactorController : ControllerBase
 
         _logger.LogInformation("User {UserId} has generated new 2FA recovery codes", user.Id);
 
-        return Ok(new
+        return Ok(new TwoFactorResponse
         {
             RecoveryCodes = recoveryCodes
         });
@@ -194,7 +213,7 @@ public class TwoFactorController : ControllerBase
 
         _logger.LogInformation("User {UserId} has reset their authentication app key", user.Id);
 
-        return Ok(new
+        return Ok(new TwoFactorResponse
         {
             Message = "Authenticator app key has been reset. You will need to configure your authenticator app using the new key."
         });

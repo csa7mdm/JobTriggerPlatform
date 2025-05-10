@@ -1,21 +1,25 @@
-using JobTriggerPlatform.Infrastructure.Authorization;
 using Microsoft.AspNetCore.Authorization;
 
-namespace JobTriggerPlatform.WebApi.Authorization;
-
-/// <summary>
-/// Attribute that ensures the user has access to the specified job.
-/// </summary>
-[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true)]
-public class JobAccessAttribute : AuthorizeAttribute
+namespace JobTriggerPlatform.WebApi.Authorization
 {
     /// <summary>
-    /// Initializes a new instance of the <see cref="JobAccessAttribute"/> class.
+    /// Authorization attribute for job access.
     /// </summary>
-    /// <param name="jobName">The name of the job to check access for.</param>
-    public JobAccessAttribute(string jobName)
+    [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class, AllowMultiple = true)]
+    public class JobAccessAttribute : AuthorizeAttribute
     {
-        // Set the policy name to match the format used in AddJobAccessPolicy
-        Policy = $"JobAccess:{jobName}";
+        /// <summary>
+        /// Initializes a new instance of the <see cref="JobAccessAttribute"/> class.
+        /// </summary>
+        /// <param name="jobName">The name of the job to authorize access for.</param>
+        public JobAccessAttribute(string jobName) : base("JobAccess")
+        {
+            JobName = jobName;
+        }
+
+        /// <summary>
+        /// Gets the name of the job.
+        /// </summary>
+        public string JobName { get; }
     }
 }

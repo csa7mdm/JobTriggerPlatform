@@ -80,3 +80,8 @@ Thumbs.db
 /Test-NuGetWithProxy.ps1
 /FixNuGetIssue.ps1
 /frontend/pnpm-lock.yaml
+/build-and-test.bat
+/build-and-test.ps1
+/build_log.txt
+/run-specific-test.ps1
+/run-with-fixed-sdk.ps1

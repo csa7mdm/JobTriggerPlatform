@@ -1,31 +1,30 @@
-namespace JobTriggerPlatform.Application.Abstractions;
-
-/// <summary>
-/// Defines the contract for a job trigger plugin.
-/// Plugin implementations should provide deployment automation functionality.
-/// </summary>
-public interface IJobTriggerPlugin
+namespace JobTriggerPlatform.Application.Abstractions
 {
     /// <summary>
-    /// Gets the name of the job that this plugin handles.
+    /// Interface for job trigger plugins.
     /// </summary>
-    string JobName { get; }
+    public interface IJobTriggerPlugin
+    {
+        /// <summary>
+        /// Gets the name of the job.
+        /// </summary>
+        string JobName { get; }
 
-    /// <summary>
-    /// Gets the roles that are required to trigger this job.
-    /// </summary>
-    IReadOnlyCollection<string> RequiredRoles { get; }
+        /// <summary>
+        /// Gets the parameters for the job.
+        /// </summary>
+        IEnumerable<PluginParameter> Parameters { get; }
 
-    /// <summary>
-    /// Gets the parameters that this job requires to be triggered.
-    /// </summary>
-    IReadOnlyCollection<PluginParameter> Parameters { get; }
+        /// <summary>
+        /// Gets the roles required to access this job.
+        /// </summary>
+        IEnumerable<string>? RequiredRoles { get; }
 
-    /// <summary>
-    /// Triggers the job with the provided parameters.
-    /// </summary>
-    /// <param name="parameters">The parameters for the job.</param>
-    /// <param name="cancellationToken">Cancellation token to cancel the operation.</param>
-    /// <returns>A task representing the asynchronous operation.</returns>
-    Task<PluginResult> TriggerAsync(IDictionary<string, string> parameters, CancellationToken cancellationToken = default);
+        /// <summary>
+        /// Triggers the job with the specified parameters.
+        /// </summary>
+        /// <param name="parameters">The parameters for the job.</param>
+        /// <returns>The result of the job trigger operation.</returns>
+        Task<PluginResult> TriggerAsync(Dictionary<string, string> parameters);
+    }
 }

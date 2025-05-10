@@ -1,4 +1,5 @@
 using JobTriggerPlatform.Domain.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,7 +23,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     {
         base.OnModelCreating(builder);
 
-        // Customize the ASP.NET Identity model and override table names
+        // Configure Identity table schemas
         builder.Entity<ApplicationUser>(entity =>
         {
             entity.ToTable("Users", "identity");
@@ -33,29 +34,34 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             entity.ToTable("Roles", "identity");
         });
 
-        builder.Entity<Microsoft.AspNetCore.Identity.IdentityUserRole<string>>(entity =>
+        builder.Entity<IdentityUserRole<string>>(entity =>
         {
             entity.ToTable("UserRoles", "identity");
+            entity.HasKey(e => new { e.UserId, e.RoleId });
         });
 
-        builder.Entity<Microsoft.AspNetCore.Identity.IdentityUserClaim<string>>(entity =>
+        builder.Entity<IdentityUserClaim<string>>(entity =>
         {
             entity.ToTable("UserClaims", "identity");
+            entity.HasKey(e => e.Id);
         });
 
-        builder.Entity<Microsoft.AspNetCore.Identity.IdentityUserLogin<string>>(entity =>
+        builder.Entity<IdentityUserLogin<string>>(entity =>
         {
             entity.ToTable("UserLogins", "identity");
+            entity.HasKey(e => new { e.LoginProvider, e.ProviderKey });
         });
 
-        builder.Entity<Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>>(entity =>
+        builder.Entity<IdentityRoleClaim<string>>(entity =>
         {
             entity.ToTable("RoleClaims", "identity");
+            entity.HasKey(e => e.Id);
         });
 
-        builder.Entity<Microsoft.AspNetCore.Identity.IdentityUserToken<string>>(entity =>
+        builder.Entity<IdentityUserToken<string>>(entity =>
         {
             entity.ToTable("UserTokens", "identity");
+            entity.HasKey(e => new { e.UserId, e.LoginProvider, e.Name });
         });
     }
 }

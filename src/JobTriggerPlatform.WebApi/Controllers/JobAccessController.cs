@@ -8,6 +8,33 @@ using System.Security.Claims;
 
 namespace JobTriggerPlatform.WebApi.Controllers;
 
+public class UserJobAccessResponse
+{
+    public string Id { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public string FullName { get; set; } = string.Empty;
+    public IList<string> JobAccess { get; set; } = new List<string>();
+}
+
+public class DetailedUserJobAccessResponse : UserJobAccessResponse
+{
+    public IList<string> DirectJobAccess { get; set; } = new List<string>();
+    public IList<string> RoleBasedJobAccess { get; set; } = new List<string>();
+}
+
+public class JobResponse
+{
+    public string JobName { get; set; } = string.Empty;
+    public IEnumerable<string> RequiredRoles { get; set; } = Array.Empty<string>();
+}
+
+public class JobAccessResponse
+{
+    public string Message { get; set; } = string.Empty;
+    public string JobName { get; set; } = string.Empty;
+    public string UserId { get; set; } = string.Empty;
+}
+
 /// <summary>
 /// Controller for managing job access.
 /// </summary>
@@ -44,18 +71,18 @@ public class JobAccessController : ControllerBase
     public async Task<IActionResult> GetUsersWithJobAccess()
     {
         var users = _userManager.Users.ToList();
-        var result = new List<object>();
+        var result = new List<UserJobAccessResponse>();
 
         foreach (var user in users)
         {
             var claims = await _userManager.GetClaimsAsync(user);
             var jobAccessClaims = claims.Where(c => c.Type == "JobAccess").Select(c => c.Value).ToList();
 
-            result.Add(new
+            result.Add(new UserJobAccessResponse
             {
-                user.Id,
-                user.Email,
-                user.FullName,
+                Id = user.Id,
+                Email = user.Email ?? string.Empty,
+                FullName = user.FullName,
                 JobAccess = jobAccessClaims
             });
         }
@@ -87,11 +114,11 @@ public class JobAccessController : ControllerBase
             .Select(p => p.JobName)
             .ToList();
 
-        return Ok(new
+        return Ok(new DetailedUserJobAccessResponse
         {
-            user.Id,
-            user.Email,
-            user.FullName,
+            Id = user.Id,
+            Email = user.Email ?? string.Empty,
+            FullName = user.FullName,
             DirectJobAccess = jobAccessClaims,
             RoleBasedJobAccess = accessibleJobsByRole
         });
@@ -146,11 +173,11 @@ public class JobAccessController : ControllerBase
         _logger.LogInformation("Updated job access for user {UserId}. Added: {AddedJobs}",
             userId, string.Join(", ", model.JobAccess));
 
-        return Ok(new
+        return Ok(new UserJobAccessResponse
         {
-            user.Id,
-            user.Email,
-            JobAccess = model.JobAccess
+            Id = user.Id,
+            Email = user.Email ?? string.Empty,
+            JobAccess = model.JobAccess.ToList()
         });
     }
 
@@ -161,9 +188,9 @@ public class JobAccessController : ControllerBase
     [HttpGet("jobs")]
     public IActionResult GetAvailableJobs()
     {
-        var jobs = _plugins.Select(p => new
+        var jobs = _plugins.Select(p => new JobResponse
         {
-            p.JobName,
+            JobName = p.JobName,
             RequiredRoles = p.RequiredRoles
         });
 
@@ -201,7 +228,7 @@ public class JobAccessController : ControllerBase
 
         _logger.LogInformation("Added job access {JobName} to user {UserId}", jobName, userId);
 
-        return Ok(new
+        return Ok(new JobAccessResponse
         {
             Message = $"Access to job '{jobName}' added successfully.",
             JobName = jobName,
@@ -242,7 +269,7 @@ public class JobAccessController : ControllerBase
 
         _logger.LogInformation("Removed job access {JobName} from user {UserId}", jobName, userId);
 
-        return Ok(new
+        return Ok(new JobAccessResponse
         {
             Message = $"Access to job '{jobName}' removed successfully.",
             JobName = jobName,

@@ -88,7 +88,10 @@ public class AuthController : ControllerBase
 
         // Generate email confirmation token and send email
         var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-        var confirmationLink = Url.Action("ConfirmEmail", "Auth", new { userId = user.Id, token }, Request.Scheme);
+        
+        // Generate the confirmation link
+        var baseUrl = $"{Request.Scheme}://{Request.Host}";
+        var confirmationLink = $"{baseUrl}/api/auth/confirm-email?userId={Uri.EscapeDataString(user.Id)}&token={Uri.EscapeDataString(token)}";
 
         var emailBody = $@"
             <h2>Welcome to the Job Trigger Platform!</h2>
@@ -146,7 +149,8 @@ public class AuthController : ControllerBase
         }
 
         // DEVELOPMENT ONLY: Special handling for example.com test accounts
-        if (model.Email.EndsWith("@example.com") && 
+        if (!string.IsNullOrEmpty(model.Email) && 
+            model.Email.EndsWith("@example.com") && 
             model.Password == "Password123!" && 
             Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development")
         {
@@ -173,13 +177,29 @@ public class AuthController : ControllerBase
                     FullName = model.Email.Split('@')[0]
                 };
                 
-                await _userManager.CreateAsync(user, model.Password);
-                await _userManager.AddToRoleAsync(user, role);
+                var createResult = await _userManager.CreateAsync(user, model.Password);
+                if (!createResult.Succeeded)
+                {
+                    _logger.LogError("Failed to create test user: {Errors}", string.Join(", ", createResult.Errors));
+                    return StatusCode(500, "Failed to create test user");
+                }
+                
+                var roleResult = await _userManager.AddToRoleAsync(user, role);
+                if (!roleResult.Succeeded)
+                {
+                    _logger.LogError("Failed to assign role to test user: {Errors}", string.Join(", ", roleResult.Errors));
+                    return StatusCode(500, "Failed to assign role to test user");
+                }
             }
             
             // Generate token and return success
             var token = await GenerateJwtToken(user);
             return Ok(new { Token = token });
+        }
+
+        if (string.IsNullOrEmpty(model.Email))
+        {
+            return BadRequest("Email is required.");
         }
 
         // Normal authentication flow
@@ -191,7 +211,7 @@ public class AuthController : ControllerBase
         }
 
         // For test users, skip email confirmation requirement
-        if (!await _userManager.IsEmailConfirmedAsync(existingUser) && 
+        if (!existingUser.EmailConfirmed && 
             !(model.Email.EndsWith("@example.com")))
         {
             _logger.LogWarning("Login attempt failed: Email {Email} not confirmed", model.Email);
@@ -221,10 +241,6 @@ public class AuthController : ControllerBase
         }
 
         _logger.LogWarning("Login attempt failed: Invalid password for {Email}", model.Email);
-        // For debugging in development, check if there's an issue with the password hash
-        var passwordValid = await _userManager.CheckPasswordAsync(existingUser, model.Password);
-        _logger.LogInformation("Password check result for {Email}: {Result}", model.Email, passwordValid);
-
         return Unauthorized("Invalid credentials.");
     }
 
