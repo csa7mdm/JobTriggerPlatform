@@ -3,6 +3,7 @@ using JobTriggerPlatform.Domain.Identity;
 using JobTriggerPlatform.WebApi.Controllers;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -79,19 +80,19 @@ namespace JobTriggerPlatform.Tests.WebApi.Controllers
 
             _mockUserManager.Setup(m => m.FindByEmailAsync(It.IsAny<string>()))
                 .ReturnsAsync((ApplicationUser)null!);
-            
+
             _mockUserManager.Setup(m => m.CreateAsync(It.IsAny<ApplicationUser>(), It.IsAny<string>()))
                 .ReturnsAsync(IdentityResult.Success);
-            
+
             _mockUserManager.Setup(m => m.AddToRoleAsync(It.IsAny<ApplicationUser>(), It.IsAny<string>()))
                 .ReturnsAsync(IdentityResult.Success);
-            
+
             _mockUserManager.Setup(m => m.GenerateEmailConfirmationTokenAsync(It.IsAny<ApplicationUser>()))
                 .ReturnsAsync("confirmation_token");
 
             // Set up URL helper for confirmation link
             var urlHelper = new Mock<IUrlHelper>();
-            urlHelper.Setup(u => u.Action(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<object>(), It.IsAny<string>()))
+            urlHelper.Setup(u => u.Action(It.IsAny<UrlActionContext>()))
                 .Returns("http://localhost:5000/api/Auth/confirm-email?userId=1&token=confirmation_token");
             _controller.Url = urlHelper.Object;
 
@@ -101,7 +102,7 @@ namespace JobTriggerPlatform.Tests.WebApi.Controllers
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result);
             Assert.Contains("User registered successfully", okResult.Value.ToString());
-            
+
             _mockEmailService.Verify(e => e.SendEmailAsync(
                 It.Is<string>(s => s == model.Email),
                 It.IsAny<string>(),
@@ -143,7 +144,7 @@ namespace JobTriggerPlatform.Tests.WebApi.Controllers
 
             _mockUserManager.Setup(m => m.FindByIdAsync(userId))
                 .ReturnsAsync(new ApplicationUser { Id = userId, Email = "test@example.com" });
-            
+
             _mockUserManager.Setup(m => m.ConfirmEmailAsync(It.IsAny<ApplicationUser>(), token))
                 .ReturnsAsync(IdentityResult.Success);
 
@@ -194,16 +195,16 @@ namespace JobTriggerPlatform.Tests.WebApi.Controllers
 
             _mockUserManager.Setup(m => m.FindByEmailAsync(model.Email))
                 .ReturnsAsync(user);
-            
+
             _mockUserManager.Setup(m => m.IsEmailConfirmedAsync(user))
                 .ReturnsAsync(true);
-            
+
             _mockSignInManager.Setup(s => s.PasswordSignInAsync(user, model.Password, model.RememberMe, It.IsAny<bool>()))
                 .ReturnsAsync(Microsoft.AspNetCore.Identity.SignInResult.Success);
-            
+
             _mockUserManager.Setup(m => m.UpdateAsync(It.IsAny<ApplicationUser>()))
                 .ReturnsAsync(IdentityResult.Success);
-                
+
             _mockUserManager.Setup(m => m.GetRolesAsync(user))
                 .ReturnsAsync(new List<string> { "Viewer" });
 
@@ -223,7 +224,8 @@ namespace JobTriggerPlatform.Tests.WebApi.Controllers
             var model = new LoginModel
             {
                 Email = "unconfirmed@example.com",
-                Password = "Password123!"
+                Password = "Password123!",
+                RememberMe = false
             };
 
             var user = new ApplicationUser
@@ -236,16 +238,21 @@ namespace JobTriggerPlatform.Tests.WebApi.Controllers
 
             _mockUserManager.Setup(m => m.FindByEmailAsync(model.Email))
                 .ReturnsAsync(user);
-            
+
             _mockUserManager.Setup(m => m.IsEmailConfirmedAsync(user))
                 .ReturnsAsync(false);
+
+            // Add this setup for PasswordSignInAsync which might be called before the email confirmation check
+            _mockSignInManager.Setup(s => s.PasswordSignInAsync(user, model.Password, model.RememberMe, It.IsAny<bool>()))
+                .ReturnsAsync(Microsoft.AspNetCore.Identity.SignInResult.Failed);
 
             // Act
             var result = await _controller.Login(model);
 
             // Assert
             var unauthorizedResult = Assert.IsType<UnauthorizedObjectResult>(result);
-            Assert.Contains("Email not confirmed", unauthorizedResult.Value.ToString());
+            dynamic resultValue = unauthorizedResult.Value;
+            Assert.Contains("Email not confirmed", resultValue.Message.ToString());
         }
 
         [Fact]
@@ -268,13 +275,13 @@ namespace JobTriggerPlatform.Tests.WebApi.Controllers
 
             _mockUserManager.Setup(m => m.FindByEmailAsync(model.Email))
                 .ReturnsAsync(user);
-            
+
             _mockUserManager.Setup(m => m.IsEmailConfirmedAsync(user))
                 .ReturnsAsync(true);
-            
+
             _mockSignInManager.Setup(s => s.PasswordSignInAsync(user, model.Password, It.IsAny<bool>(), It.IsAny<bool>()))
                 .ReturnsAsync(Microsoft.AspNetCore.Identity.SignInResult.Failed);
-                
+
             _mockUserManager.Setup(m => m.CheckPasswordAsync(user, model.Password))
                 .ReturnsAsync(false);
 
@@ -283,7 +290,8 @@ namespace JobTriggerPlatform.Tests.WebApi.Controllers
 
             // Assert
             var unauthorizedResult = Assert.IsType<UnauthorizedObjectResult>(result);
-            Assert.Contains("Invalid credentials", unauthorizedResult.Value.ToString());
+            dynamic resultValue = unauthorizedResult.Value;
+            Assert.Contains("Invalid credentials", resultValue.Message.ToString());
         }
 
         [Fact]
@@ -306,10 +314,10 @@ namespace JobTriggerPlatform.Tests.WebApi.Controllers
 
             _mockUserManager.Setup(m => m.FindByEmailAsync(model.Email))
                 .ReturnsAsync(user);
-            
+
             _mockUserManager.Setup(m => m.IsEmailConfirmedAsync(user))
                 .ReturnsAsync(true);
-            
+
             _mockSignInManager.Setup(s => s.PasswordSignInAsync(user, model.Password, It.IsAny<bool>(), It.IsAny<bool>()))
                 .ReturnsAsync(Microsoft.AspNetCore.Identity.SignInResult.LockedOut);
 
@@ -341,10 +349,10 @@ namespace JobTriggerPlatform.Tests.WebApi.Controllers
 
             _mockUserManager.Setup(m => m.FindByEmailAsync(model.Email))
                 .ReturnsAsync(user);
-            
+
             _mockUserManager.Setup(m => m.IsEmailConfirmedAsync(user))
                 .ReturnsAsync(true);
-            
+
             _mockSignInManager.Setup(s => s.PasswordSignInAsync(user, model.Password, It.IsAny<bool>(), It.IsAny<bool>()))
                 .ReturnsAsync(Microsoft.AspNetCore.Identity.SignInResult.TwoFactorRequired);
 
@@ -354,7 +362,7 @@ namespace JobTriggerPlatform.Tests.WebApi.Controllers
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result);
             Assert.NotNull(okResult.Value);
-            
+
             // Check if the result indicates that 2FA is required
             var resultType = okResult.Value.GetType();
             var requiresTwoFactorProp = resultType.GetProperty("RequiresTwoFactor");
@@ -382,13 +390,13 @@ namespace JobTriggerPlatform.Tests.WebApi.Controllers
 
             _mockSignInManager.Setup(s => s.GetTwoFactorAuthenticationUserAsync())
                 .ReturnsAsync(user);
-            
+
             _mockSignInManager.Setup(s => s.TwoFactorAuthenticatorSignInAsync(model.Code, model.RememberMe, model.RememberClient))
                 .ReturnsAsync(Microsoft.AspNetCore.Identity.SignInResult.Success);
-                
+
             _mockUserManager.Setup(m => m.UpdateAsync(It.IsAny<ApplicationUser>()))
                 .ReturnsAsync(IdentityResult.Success);
-                
+
             _mockUserManager.Setup(m => m.GetRolesAsync(user))
                 .ReturnsAsync(new List<string> { "Viewer" });
 
@@ -421,7 +429,7 @@ namespace JobTriggerPlatform.Tests.WebApi.Controllers
 
             _mockSignInManager.Setup(s => s.GetTwoFactorAuthenticationUserAsync())
                 .ReturnsAsync(user);
-            
+
             _mockSignInManager.Setup(s => s.TwoFactorAuthenticatorSignInAsync(model.Code, model.RememberMe, model.RememberClient))
                 .ReturnsAsync(Microsoft.AspNetCore.Identity.SignInResult.Failed);
 
@@ -474,12 +482,12 @@ namespace JobTriggerPlatform.Tests.WebApi.Controllers
             };
             var identity = new ClaimsIdentity(claims, "Test");
             var principal = new ClaimsPrincipal(identity);
-            
+
             var httpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext
             {
                 User = principal
             };
-            
+
             _controller.ControllerContext = new ControllerContext
             {
                 HttpContext = httpContext
@@ -487,7 +495,7 @@ namespace JobTriggerPlatform.Tests.WebApi.Controllers
 
             _mockUserManager.Setup(m => m.GetUserAsync(It.IsAny<ClaimsPrincipal>()))
                 .ReturnsAsync(user);
-                
+
             _mockUserManager.Setup(m => m.GetAuthenticatorKeyAsync(user))
                 .ReturnsAsync("AUTHKEY123456");
 
@@ -497,7 +505,7 @@ namespace JobTriggerPlatform.Tests.WebApi.Controllers
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result);
             Assert.NotNull(okResult.Value);
-            
+
             // Check if the result contains expected properties
             var resultType = okResult.Value.GetType();
             Assert.NotNull(resultType.GetProperty("AuthenticatorKey"));
@@ -528,12 +536,12 @@ namespace JobTriggerPlatform.Tests.WebApi.Controllers
             };
             var identity = new ClaimsIdentity(claims, "Test");
             var principal = new ClaimsPrincipal(identity);
-            
+
             var httpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext
             {
                 User = principal
             };
-            
+
             _controller.ControllerContext = new ControllerContext
             {
                 HttpContext = httpContext
@@ -541,16 +549,16 @@ namespace JobTriggerPlatform.Tests.WebApi.Controllers
 
             _mockUserManager.Setup(m => m.GetUserAsync(It.IsAny<ClaimsPrincipal>()))
                 .ReturnsAsync(user);
-                
+
             _mockUserManager.Setup(m => m.VerifyTwoFactorTokenAsync(
-                    user, 
-                    It.IsAny<string>(), 
+                    user,
+                    It.IsAny<string>(),
                     model.Code))
                 .ReturnsAsync(true);
-                
+
             _mockUserManager.Setup(m => m.SetTwoFactorEnabledAsync(user, true))
                 .ReturnsAsync(IdentityResult.Success);
-                
+
             _mockUserManager.Setup(m => m.GenerateNewTwoFactorRecoveryCodesAsync(user, 10))
                 .ReturnsAsync(new[] { "code1", "code2", "code3" });
 
@@ -560,12 +568,12 @@ namespace JobTriggerPlatform.Tests.WebApi.Controllers
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result);
             Assert.NotNull(okResult.Value);
-            
+
             // Check if the result contains recovery codes
             var resultType = okResult.Value.GetType();
             var recoveryCodesProp = resultType.GetProperty("RecoveryCodes");
             Assert.NotNull(recoveryCodesProp);
-            
+
             var recoveryCodes = (IEnumerable<string>)recoveryCodesProp.GetValue(okResult.Value)!;
             Assert.Equal(3, recoveryCodes.Count());
         }
@@ -589,12 +597,12 @@ namespace JobTriggerPlatform.Tests.WebApi.Controllers
             };
             var identity = new ClaimsIdentity(claims, "Test");
             var principal = new ClaimsPrincipal(identity);
-            
+
             var httpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext
             {
                 User = principal
             };
-            
+
             _controller.ControllerContext = new ControllerContext
             {
                 HttpContext = httpContext
@@ -602,7 +610,7 @@ namespace JobTriggerPlatform.Tests.WebApi.Controllers
 
             _mockUserManager.Setup(m => m.GetUserAsync(It.IsAny<ClaimsPrincipal>()))
                 .ReturnsAsync(user);
-                
+
             _mockUserManager.Setup(m => m.SetTwoFactorEnabledAsync(user, false))
                 .ReturnsAsync(IdentityResult.Success);
 

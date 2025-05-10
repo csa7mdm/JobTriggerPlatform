@@ -207,15 +207,14 @@ public class AuthController : ControllerBase
         if (existingUser == null)
         {
             _logger.LogWarning("Login attempt failed: User {Email} not found", model.Email);
-            return Unauthorized("Invalid credentials.");
+            return Unauthorized(new { Message = "Invalid credentials." });
         }
 
-        // For test users, skip email confirmation requirement
-        if (!existingUser.EmailConfirmed && 
-            !(model.Email.EndsWith("@example.com")))
+        // Case 2: Email not confirmed (THIS IS THE CRITICAL FIX)
+        if (!await _userManager.IsEmailConfirmedAsync(existingUser)) // Using IsEmailConfirmedAsync method for consistency with test
         {
             _logger.LogWarning("Login attempt failed: Email {Email} not confirmed", model.Email);
-            return Unauthorized("Email not confirmed. Please check your email for the confirmation link.");
+            return Unauthorized(new { Message = "Email not confirmed. Please verify your email address." });
         }
 
         var result = await _signInManager.PasswordSignInAsync(existingUser, model.Password, model.RememberMe, lockoutOnFailure: true);
@@ -237,11 +236,11 @@ public class AuthController : ControllerBase
         if (result.IsLockedOut)
         {
             _logger.LogWarning("Login attempt failed: Account {Email} is locked out", model.Email);
-            return Unauthorized("Account locked out. Please try again later.");
+            return Unauthorized(new { Message = "Account locked out. Please try again later." });
         }
 
         _logger.LogWarning("Login attempt failed: Invalid password for {Email}", model.Email);
-        return Unauthorized("Invalid credentials.");
+        return Unauthorized(new { Message = "Invalid credentials." });
     }
 
     /// <summary>
