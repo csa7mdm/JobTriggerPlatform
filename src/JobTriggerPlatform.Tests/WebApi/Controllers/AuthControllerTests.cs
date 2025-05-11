@@ -251,8 +251,8 @@ namespace JobTriggerPlatform.Tests.WebApi.Controllers
 
             // Assert
             var unauthorizedResult = Assert.IsType<UnauthorizedObjectResult>(result);
-            dynamic resultValue = unauthorizedResult.Value;
-            Assert.Contains("Email not confirmed", resultValue.Message.ToString());
+            Assert.NotNull(unauthorizedResult.Value); // Ensures Value is not null
+            Assert.Contains("Email not confirmed", unauthorizedResult.Value.ToString()); // Check the string content
         }
 
         [Fact]
@@ -290,8 +290,8 @@ namespace JobTriggerPlatform.Tests.WebApi.Controllers
 
             // Assert
             var unauthorizedResult = Assert.IsType<UnauthorizedObjectResult>(result);
-            dynamic resultValue = unauthorizedResult.Value;
-            Assert.Contains("Invalid credentials", resultValue.Message.ToString());
+            Assert.NotNull(unauthorizedResult.Value); // Ensures Value is not null
+            Assert.Contains("Invalid credentials", unauthorizedResult.Value.ToString()); // Check the string content
         }
 
         [Fact]

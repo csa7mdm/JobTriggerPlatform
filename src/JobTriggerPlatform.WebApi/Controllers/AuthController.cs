@@ -260,7 +260,7 @@ public class AuthController : ControllerBase
         var user = await _signInManager.GetTwoFactorAuthenticationUserAsync();
         if (user == null)
         {
-            return Unauthorized("Invalid two-factor authentication attempt.");
+            return Unauthorized(new { Message = "Invalid two-factor authentication attempt." });
         }
 
         var result = await _signInManager.TwoFactorAuthenticatorSignInAsync(model.Code, model.RememberMe, model.RememberClient);
@@ -276,10 +276,10 @@ public class AuthController : ControllerBase
 
         if (result.IsLockedOut)
         {
-            return Unauthorized("Account locked out. Please try again later.");
+            return Unauthorized(new { Message = "Account locked out. Please try again later." });
         }
 
-        return Unauthorized("Invalid authenticator code.");
+        return Unauthorized(new { Message = "Invalid authenticator code." });
     }
 
     /// <summary>
@@ -292,7 +292,7 @@ public class AuthController : ControllerBase
         var user = await _userManager.GetUserAsync(User);
         if (user == null)
         {
-            return Unauthorized("User not found.");
+            return Unauthorized(new { Message = "User not found." });
         }
 
         var unformattedKey = await _userManager.GetAuthenticatorKeyAsync(user);
