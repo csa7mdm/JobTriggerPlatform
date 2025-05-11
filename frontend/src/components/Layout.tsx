@@ -31,6 +31,7 @@ import {
   Group as UsersIcon,
   VpnKey as RolesIcon,
   Schedule as JobsAdminIcon,
+  Business as TenantsIcon,
 } from '@mui/icons-material';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth';
@@ -173,6 +174,15 @@ const Layout: React.FC = () => {
                 <ListItemText primary="Job Management" />
               </ListItemButton>
             </ListItem>
+            
+            <ListItem disablePadding selected={location.pathname === ROUTES.ADMIN.TENANTS}>
+              <ListItemButton component={Link} to={ROUTES.ADMIN.TENANTS} sx={{ pl: 4 }}>
+                <ListItemIcon>
+                  <TenantsIcon />
+                </ListItemIcon>
+                <ListItemText primary="Tenants" />
+              </ListItemButton>
+            </ListItem>
           </List>
         </>
       )}
@@ -259,6 +269,7 @@ const Layout: React.FC = () => {
             {location.pathname === ROUTES.ADMIN.USERS && 'User Management'}
             {location.pathname === ROUTES.ADMIN.ROLES && 'Role Management'}
             {location.pathname === ROUTES.ADMIN.JOBS && 'Job Management'}
+            {location.pathname === ROUTES.ADMIN.TENANTS && 'Tenant Management'}
           </Typography>
           
           {/* Theme Toggler */}

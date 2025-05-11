@@ -18,6 +18,7 @@ export const ROUTES = {
     USERS: '/admin/users',
     ROLES: '/admin/roles',
     JOBS: '/admin/jobs',
+    TENANTS: '/admin/tenants',
   },
   UNAUTHORIZED: '/unauthorized'
 };

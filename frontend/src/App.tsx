@@ -15,6 +15,7 @@ import { useAuth } from './auth'
 import UsersAdmin from './pages/admin/UsersAdmin'
 import RolesAdmin from './pages/admin/RolesAdmin'
 import JobsAdmin from './pages/admin/JobsAdmin'
+import TenantsAdmin from './pages/admin/TenantsAdmin'
 
 // Constants
 import { ROUTES } from './config/constants'
@@ -65,7 +66,6 @@ function App() {
           }
         />
         
-        {/* Catch all unknown routes */}
         {/* Admin Routes */}
         <Route
           path={ROUTES.ADMIN.USERS}
@@ -94,6 +94,16 @@ function App() {
           }
         />
         
+        <Route
+          path={ROUTES.ADMIN.TENANTS}
+          element={
+            <AdminRouteGuard>
+              <TenantsAdmin />
+            </AdminRouteGuard>
+          }
+        />
+        
+        {/* Catch all unknown routes */}
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
