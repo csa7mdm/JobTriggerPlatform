@@ -37,6 +37,7 @@ public class ApiAntiForgeryCookieMiddleware
     {
         // Exclude OPTIONS requests, Swagger requests, and Auth endpoints from anti-forgery check
         var path = context.Request.Path.Value?.ToLowerInvariant() ?? "";
+        _logger.LogInformation($"[AntiForgery] Method: {context.Request.Method}, Path: {path}");
         if (context.Request.Method == HttpMethods.Options ||
             path.StartsWith("/swagger") ||
             path.StartsWith("/api/auth/"))

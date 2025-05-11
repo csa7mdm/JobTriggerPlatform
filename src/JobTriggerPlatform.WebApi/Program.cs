@@ -201,7 +201,7 @@ try
     });
 
     // Add Controllers with input validation
-    builder.Services.AddControllers(options =>
+    builder.Services.AddControllersWithViews(options =>
     {
         // Limit the maximum model binding size
         options.MaxModelBindingCollectionSize = 1000; // Maximum items in a collection
@@ -233,8 +233,9 @@ try
         };
     });
 
-    // Add FluentValidation without auto-registration
-    builder.Services.AddFluentValidation();
+    // Add FluentValidation using the new recommended approach
+    builder.Services.AddFluentValidationAutoValidation()
+                    .AddFluentValidationClientsideAdapters();
     // Manually register any validators we need except JobTriggerRequestValidator
     // This avoids the circular dependency issue
 
@@ -361,7 +362,7 @@ try
         foreach (var plugin in plugins)
         {
             logger.LogInformation("Loaded plugin: {PluginName} with required roles: {RequiredRoles}",
-                plugin.JobName, string.Join(", ", plugin.RequiredRoles));
+                plugin.JobName, string.Join(", ", plugin.RequiredRoles ?? Array.Empty<string>()));
         }
     }
     catch (Exception ex)

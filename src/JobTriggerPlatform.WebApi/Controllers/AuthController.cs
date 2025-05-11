@@ -139,6 +139,7 @@ public class AuthController : ControllerBase
     /// </summary>
     /// <param name="model">The login model.</param>
     /// <returns>The result of the login attempt.</returns>
+    [AllowAnonymous]
     [HttpPost("login")]
     [IgnoreAntiforgeryToken]
     public async Task<IActionResult> Login([FromBody] LoginModel model)
@@ -248,6 +249,7 @@ public class AuthController : ControllerBase
     /// </summary>
     /// <param name="model">The two-factor authentication model.</param>
     /// <returns>The result of the login attempt.</returns>
+    [AllowAnonymous]
     [HttpPost("login-2fa")]
     [IgnoreAntiforgeryToken]
     public async Task<IActionResult> LoginWithTwoFactor([FromBody] TwoFactorModel model)
