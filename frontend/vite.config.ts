@@ -12,12 +12,13 @@ export default defineConfig({
   },
   server: {
     port: 3000,
-    proxy: {
-      '/api': {
-        target: 'https://localhost:7001',
-        changeOrigin: true,
-        secure: false,
-      },
-    },
+    // Remove or comment out the proxy to ensure MSW handles API requests in development
+    // proxy: {
+    //   '/api': {
+    //     target: 'https://localhost:7001',
+    //     changeOrigin: true,
+    //     secure: false,
+    //   },
+    // },
   },
 })
